@@ -2,7 +2,7 @@ import random, os
 from flask import Flask, render_template_string, redirect, request, session, jsonify
 
 app = Flask(__name__)
-app.secret_key = "casino724_animated_v1"
+app.secret_key = "casino724_sweet_bonanza_beta"
 
 # --- VERİ TABANI ---
 db = {
@@ -11,27 +11,30 @@ db = {
     "bakiye_talepleri": []
 }
 
-# --- OYUN DATA (Hareketli Renk Paletleri Eklendi) ---
+# --- SWEET BONANZA İÇİN GERÇEK SEMBOLLER VE AYARLAR ---
+# Sweet Bonanza'nın 6x5 ızgarasına uygun hale getirilmiştir.
+# Her sembol için direkt görsel linki kullanılmıştır.
 OYUN_DATA = {
-    "Sweet Bonanza": {"s": ["🍭", "🍉", "🍎", "🍇", "🍌", "🍬"], "cols": 4, "c1": "#ff75bd", "c2": "#ffafbd", "win_text": "🍭 ŞEKER PATLAMASI!"},
-    "Gates of Olympus": {"s": ["⚡", "👑", "💍", "🍷", "💎", "🔱"], "cols": 5, "c1": "#4b0082", "c2": "#000000", "win_text": "⚡ ZEUS ÇARPTI!"},
-    "The Dog House": {"s": ["🐶", "🦴", "🏠", "🐕", "🐾"], "cols": 3, "c1": "#8b4513", "c2": "#deb887", "win_text": "🐾 HAV HAV KAZANÇ!"},
-    "Big Bass Bonanza": {"s": ["🐟", "🎣", "🛶", "🛟", "🐠"], "cols": 4, "c1": "#0077be", "c2": "#00a8cc", "win_text": "🎣 BÜYÜK BALIK!"},
-    "Sugar Rush": {"s": ["🧸", "🍬", "🧁", "🍩", "🍭"], "cols": 5, "c1": "#db7093", "c2": "#ffc0cb", "win_text": "🧸 REÇEL DOLU!"},
-    "Wanted Dead or Wild": {"s": ["🤠", "🔫", "🥃", "🌵", "💰"], "cols": 3, "c1": "#3d2b1f", "c2": "#1a1a1a", "win_text": "🔫 DÜELLO!"},
-    "Starlight Princess": {"s": ["⭐", "💖", "🌙", "👑", "🔮"], "cols": 4, "c1": "#1e90ff", "c2": "#00008b", "win_text": "⭐ YILDIZ GÜCÜ!"},
-    "Wolf Gold": {"s": ["🐺", "🌙", "🦅", "🐂", "🐎"], "cols": 3, "c1": "#2f4f4f", "c2": "#000000", "win_text": "🐺 ULUMA BONUSU!"}
+    "Sweet Bonanza": {
+        "s": [
+            "https://i.imgur.com/K5m5h7G.png", # Kırmızı Kalp Şeker
+            "https://i.imgur.com/X0S3B7r.png", # Mor Kare Şeker
+            "https://i.imgur.com/G4P4Q2U.png", # Yeşil Elmas Şeker
+            "https://i.imgur.com/H1J1p1x.png", # Mavi Oval Şeker
+            "https://i.imgur.com/L7E7k7u.png", # Elma
+            "https://i.imgur.com/P2N2o2y.png", # Erik
+            "https://i.imgur.com/R3S3p3t.png", # Karpuz
+            "https://i.imgur.com/T4U4v4w.png"  # Muz
+        ],
+        "rows": 5, "cols": 6, # 6x5 Izgara = 30 sembol
+        "c1": "#ff75bd", "c2": "#ffafbd", # Arka plan renkleri
+        "win_text": "🍬 BÜYÜK KAZANÇ!"
+    }
 }
 
 OYUNLAR = [
-    {"ad": "Sweet Bonanza", "img": "https://img.freepik.com/premium-photo/colorful-candies-sweets-falling-into-slot-machine-generative-ai_175880-1430.jpg"},
-    {"ad": "Gates of Olympus", "img": "https://img.freepik.com/free-photo/god-zeus-concept-illustration_23-2150534293.jpg"},
-    {"ad": "The Dog House", "img": "https://img.freepik.com/free-photo/cute-puppy-house-concept_23-2150166254.jpg"},
-    {"ad": "Big Bass Bonanza", "img": "https://img.freepik.com/premium-photo/fishing-hobby-professional-equipment-generative-ai_175880-1500.jpg"},
-    {"ad": "Sugar Rush", "img": "https://img.freepik.com/premium-photo/pink-candyland-abstract-background-generative-ai_175880-1200.jpg"},
-    {"ad": "Wanted Dead or Wild", "img": "https://img.freepik.com/free-photo/wild-west-wanted-poster-vintage_23-2150166600.jpg"},
-    {"ad": "Starlight Princess", "img": "https://img.freepik.com/premium-photo/anime-princess-starry-night-generative-ai_175880-1600.jpg"},
-    {"ad": "Wolf Gold", "img": "https://img.freepik.com/free-photo/wolf-concept-illustration_23-2150166540.jpg"}
+    {"ad": "Sweet Bonanza", "img": "https://i.imgur.com/s6n5o5k.png"}, # Sweet Bonanza logosu
+    # Diğer oyunlar şimdilik yok, sadece Sweet Bonanza odaklıyız
 ]
 
 HTML = """
@@ -51,11 +54,29 @@ HTML = """
         
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1000; flex-direction:column; align-items:center; justify-content:center; }
         .slot-content { 
-            width:95%; max-width:450px; padding:20px; border-radius:30px; border:4px solid #fcd535; text-align:center;
+            width:95%; max-width:550px; padding:20px; border-radius:30px; border:4px solid #fcd535; text-align:center;
             background-size: 400% 400%; animation: flow 10s ease infinite; box-shadow: 0 0 50px rgba(0,0,0,0.5);
         }
-        .reels-container { display:flex; justify-content:center; gap:8px; margin:20px 0; }
-        .reel { background:rgba(0,0,0,0.7); width:65px; height:85px; display:flex; align-items:center; justify-content:center; font-size:40px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); }
+        .reels-grid { 
+            display:grid; 
+            grid-template-columns: repeat(var(--cols), 1fr); 
+            gap:5px; 
+            margin:20px auto;
+            width:fit-content; /* Izgaranın ortalanması için */
+            background:rgba(0,0,0,0.6);
+            padding:10px;
+            border-radius:15px;
+            border:1px solid rgba(255,255,255,0.1);
+        }
+        .reel-cell { 
+            width:60px; height:60px; 
+            display:flex; align-items:center; justify-content:center; 
+            font-size:30px; 
+            border-radius:8px; 
+            overflow:hidden;
+            transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+        }
+        .reel-cell img { width:100%; height:100%; object-fit:contain; }
         
         .btn-spin { background:#fcd535; color:black; border:none; padding:15px; border-radius:50px; font-weight:bold; width:100%; font-size:1.1rem; cursor:pointer; }
         .nav { display:flex; background:#16181c; border-top:1px solid #333; position:fixed; bottom:0; width:100%; z-index:100; }
@@ -63,7 +84,7 @@ HTML = """
     </style>
 </head>
 <body id="body-bg">
-    <div class="header">🎰 CASINO7-24 PRESTIGE</div>
+    <div class="header">🎰 CASINO7-24 PROTOTYPE</div>
 
     {% if not session.user %}
         <div style="padding:40px; text-align:center;">
@@ -120,7 +141,7 @@ HTML = """
                 <span id="m-title" style="font-weight:bold;">Oyun</span>
                 <span id="m-bal" style="color:#0ecb81; font-weight:bold;">{{ user.bakiye }} €</span>
             </div>
-            <div class="reels-container" id="reels-box"></div>
+            <div class="reels-grid" id="reels-box" style="--cols:6;"></div>
             <p id="m-msg" style="height:25px; color:#fcd535; font-weight:bold; font-size:1.2rem; text-shadow: 0 0 10px black;"></p>
             <button id="s-btn" class="btn-spin" onclick="spinNow()">SPIN ÇEVİR (10€)</button>
             <button onclick="location.reload()" style="background:none; border:none; color:white; margin-top:20px; text-decoration:underline;">KAPAT</button>
@@ -129,19 +150,22 @@ HTML = """
 
     <script>
     let activeGame = "";
+    let gameSettings = {};
+
     function openGame(n){
         activeGame = n;
         document.getElementById('m-title').innerText = n;
         document.getElementById('modal').style.display = 'flex';
         fetch('/theme?n='+n).then(r=>r.json()).then(d=>{
-            // Hareketli Arka Plan Uygula
+            gameSettings = d; // Oyun ayarlarını kaydet
             document.getElementById('m-bg').style.backgroundImage = `linear-gradient(-45deg, ${d.c1}, ${d.c2}, ${d.c1}, ${d.c2})`;
             document.getElementById('body-bg').style.background = d.c1;
             
             let box = document.getElementById('reels-box');
+            box.style.setProperty('--cols', d.cols); // CSS grid sütun sayısını ayarla
             box.innerHTML = "";
-            for(let i=0; i<d.cols; i++){
-                box.innerHTML += `<div id="r${i}" class="reel">🎲</div>`;
+            for(let i=0; i < d.rows * d.cols; i++){
+                box.innerHTML += `<div id="r${i}" class="reel-cell"><img src="${d.s[0]}"></div>`; // Başlangıç sembolü
             }
         });
     }
@@ -154,19 +178,56 @@ HTML = """
         document.getElementById('s-btn').disabled = true;
         document.getElementById('m-msg').innerText = "";
         
+        let totalCells = gameSettings.rows * gameSettings.cols;
         let frames = 0;
         let timer = setInterval(()=>{
-            for(let j=0; j<d.cols; j++){
-                document.getElementById('r'+j).innerText = d.pool[Math.floor(Math.random()*d.pool.length)];
+            for(let j=0; j < totalCells; j++){
+                // Rastgele döner sembolleri göster
+                let randomSymbol = gameSettings.s[Math.floor(Math.random()*gameSettings.s.length)];
+                document.getElementById('r'+j).innerHTML = `<img src="${randomSymbol}">`;
             }
-            if(frames++ > 15){
+            if(frames++ > 15){ // Spin süresi
                 clearInterval(timer);
-                for(let j=0; j<d.cols; j++){ document.getElementById('r'+j).innerText = d.res[j]; }
+                for(let j=0; j < totalCells; j++){ 
+                    document.getElementById('r'+j).innerHTML = `<img src="${d.res[j]}">`;
+                }
                 document.getElementById('m-bal').innerText = d.nb + " €";
-                document.getElementById('s-btn').disabled = false;
+                
                 if(d.win > 0) {
                     document.getElementById('m-msg').innerText = d.msg;
                     confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    // Basit bir "patlama" efekti simülasyonu
+                    setTimeout(()=>{
+                        for(let j=0; j < totalCells; j++){
+                            if(d.winning_cells && d.winning_cells.includes(j)){
+                                let cell = document.getElementById('r'+j);
+                                cell.style.transform = 'scale(0)';
+                                cell.style.opacity = '0';
+                            }
+                        }
+                        setTimeout(()=>{
+                             // Kazanan sembolleri kaldır ve yenilerini getir
+                            fetch('/spin', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'game='+activeGame+'&respin=true'})
+                            .then(r=>r.json())
+                            .then(new_d => {
+                                for(let j=0; j < totalCells; j++){
+                                    let cell = document.getElementById('r'+j);
+                                    cell.style.transform = 'scale(1)';
+                                cell.style.opacity = '1';
+                                    cell.innerHTML = `<img src="${new_d.res[j]}">`;
+                                }
+                                document.getElementById('m-bal').innerText = new_d.nb + " €";
+                                if(new_d.win > 0) {
+                                     document.getElementById('m-msg').innerText = new_d.msg + " (Respin!)";
+                                } else {
+                                     document.getElementById('m-msg').innerText = "";
+                                }
+                                document.getElementById('s-btn').disabled = false;
+                            });
+                        }, 500); // Semboller kaybolduktan sonra yeni semboller düşer
+                    }, 1000); // Patlama animasyonu süresi
+                } else {
+                    document.getElementById('s-btn').disabled = false;
                 }
             }
         }, 80);
@@ -220,23 +281,54 @@ def spin():
     if not u: return jsonify({"err": "Giriş yap!"})
     game = request.form.get('game')
     bet = 10.0
-    if db["users"][u]["bakiye"] < bet: return jsonify({"err": "Bakiye bitti!"})
+    is_respin = request.form.get('respin') == 'true'
+
+    if not is_respin and db["users"][u]["bakiye"] < bet: return jsonify({"err": "Bakiye bitti!"})
+    if not is_respin: db["users"][u]["bakiye"] -= bet
     
-    db["users"][u]["bakiye"] -= bet
     data = OYUN_DATA[game]
-    is_win = random.random() < 0.22 
-    cols = data["cols"]
+    total_cells = data["rows"] * data["cols"]
     
+    # Kazanma mantığı (Basitçe 8 aynı sembolü yakalamak)
+    # Sweet Bonanza'da "pay anywhere" olduğu için 8+ aynı sembol aranır.
+    is_win = random.random() < 0.25 # %25 Kazanma Şansı
+    
+    final_reels = []
+    winning_cells = []
+    win_amt = 0
+
     if is_win:
-        s = random.choice(data["s"])
-        res = [s] * cols
-        win_amt = bet * random.randint(5, 30)
+        # Rastgele 8-15 arası aynı sembol üret
+        winning_symbol = random.choice(data["s"])
+        num_winning_symbols = random.randint(8, 15)
+        
+        # Tüm hücrelere rastgele sembolleri doldur
+        for _ in range(total_cells):
+            final_reels.append(random.choice(data["s"]))
+
+        # Kazanan sembolleri rastgele hücrelere yerleştir
+        for _ in range(num_winning_symbols):
+            idx = random.randint(0, total_cells - 1)
+            final_reels[idx] = winning_symbol
+            winning_cells.append(idx)
+        
+        win_amt = bet * random.choice([2, 5, 10, 20])
         db["users"][u]["bakiye"] += win_amt
     else:
-        res = [random.choice(data["s"]) for _ in range(cols)]
+        # Kazanma yoksa tamamen rastgele semboller
+        for _ in range(total_cells):
+            final_reels.append(random.choice(data["s"]))
         win_amt = 0
         
-    return jsonify({"res": res, "win": win_amt, "nb": db["users"][u]["bakiye"], "msg": data["win_text"], "pool": data["s"], "cols": cols})
+    return jsonify({
+        "res": final_reels, 
+        "win": win_amt, 
+        "nb": db["users"][u]["bakiye"], 
+        "msg": data["win_text"], 
+        "pool": data["s"], 
+        "cols": data["cols"],
+        "winning_cells": winning_cells # Kazanan hücreleri işaretlemek için
+    })
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect('/')
