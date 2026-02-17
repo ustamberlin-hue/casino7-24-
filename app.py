@@ -1,156 +1,127 @@
-import os
-import sqlite3
-import random
-from flask import Flask, request, redirect, session, url_for
+import os, sqlite3, random
+from flask import Flask, request, redirect, session, url_for, render_template_string
 
 app = Flask(__name__)
-app.secret_key = "batak_vip_exclusive_2024"
+app.secret_key = "batak_masa_2024"
 DB = "site.db"
 
-# ---------------- DATABASE INIT ----------------
+# ---------------- DATABASE ----------------
 def init_db():
     with sqlite3.connect(DB) as con:
         cur = con.cursor()
-        # Kullanıcılar Tablosu (Varsayılan bakiye 1000)
-        cur.execute("""CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            balance INTEGER DEFAULT 1000,
-            is_admin INTEGER DEFAULT 0
-        )""")
-        # Bakiye İstekleri Tablosu
-        cur.execute("""CREATE TABLE IF NOT EXISTS requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            amount INTEGER,
-            status TEXT DEFAULT 'pending'
-        )""")
-        # İlk Admini Oluştur (admin / 1234)
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, balance INTEGER DEFAULT 1000, is_admin INTEGER DEFAULT 0)")
         cur.execute("INSERT OR IGNORE INTO users (username, password, is_admin) VALUES ('admin', '1234', 1)")
 init_db()
 
-# ---------------- HELPERS ----------------
-def get_user():
-    if "user_id" in session:
-        with sqlite3.connect(DB) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM users WHERE id=?", (session["user_id"],))
-            return cur.fetchone()
-    return None
+# ---------------- GAME LOGIC ----------------
+def yeni_desteyi_dagit():
+    renkler = ['♠️', '♣️', '♦️', '♥️']
+    sayilar = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    deste = [f"{s}{r}" for r in renkler for s in sayilar]
+    random.shuffle(deste)
+    return [sorted(deste[i:i+13]) for i in range(0, 52, 13)]
 
-def batak_motoru():
-    # Bot ve Oyun Mantığı: Basitleştirilmiş Batak Simülasyonu
-    oyuncular = ["Siz", "Bot_Mert", "Bot_Selin", "Bot_Caner"]
-    skorlar = {o: random.randint(1, 13) for o in oyuncular} # Rastgele el alma
-    kazanan = max(skorlar, key=skorlar.get)
-    return kazanan, skorlar
+# ---------------- HTML TASARIM (MASA) ----------------
+MASA_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { background: #2c3e50; color: white; font-family: sans-serif; text-align: center; }
+        .table { 
+            background: #27ae60; width: 80%; height: 500px; margin: 50px auto; 
+            border-radius: 200px; border: 15px solid #7e5233; position: relative;
+        }
+        .player { position: absolute; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 10px; }
+        .top { top: 20px; left: 45%; }
+        .left { top: 45%; left: 20px; }
+        .right { top: 45%; right: 20px; }
+        .bottom { bottom: 20px; left: 35%; width: 30%; }
+        .center-pot { 
+            position: absolute; top: 35%; left: 35%; width: 30%; height: 30%;
+            border: 2px dashed white; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        }
+        .card { 
+            background: white; color: black; padding: 10px; border-radius: 5px; 
+            margin: 5px; display: inline-block; cursor: pointer; border: 1px solid #000;
+        }
+        .card:hover { background: #f1c40f; }
+        .played-card { background: white; color: black; padding: 15px; border-radius: 5px; margin: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Bakiye: {{ user[3] }} TL</h2>
+    <div class="table">
+        <div class="player top">Bot Ece</div>
+        <div class="player left">Bot admin</div>
+        <div class="player right">Bot Derya</div>
+        
+        <div class="center-pot">
+            {% for c in masa %}
+                <div class="played-card">{{ c }}</div>
+            {% endfor %}
+            {% if not masa %} <p>Kart Bekleniyor...</p> {% endif %}
+        </div>
+
+        <div class="bottom">
+            <p>Siz (Emre)</p>
+            {% for i, c in enumerate(elim) %}
+                <a href="/play_card/{{ i }}" style="text-decoration:none;">
+                    <div class="card">{{ c }}</div>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+    <a href="/logout" style="color:white;">Masadan Kalk</a>
+</body>
+</html>
+"""
 
 # ---------------- ROUTES ----------------
 @app.route('/')
 def home():
-    user = get_user()
-    if not user: return redirect(url_for('login'))
-    return f"""
-    <div style="font-family:sans-serif; text-align:center;">
-        <h2>🃏 Batak Salonu</h2>
-        <p>Hoşgeldin <b>{user[1]}</b> | Bakiye: <b>{user[3]} TL</b></p>
-        <hr>
-        <a href="/play"><button style="padding:10px 20px; background:green; color:white; border:none; border-radius:5px; cursor:pointer;">HIZLI MASAYA OTUR (100 TL)</button></a><br><br>
-        <a href="/request">Bakiye Yükle</a> | <a href="/settings">Şifre Değiştir</a> | <a href="/logout">Çıkış</a>
-        {"<br><br><a href='/admin' style='color:red;'>RED ADMIN PANEL</a>" if user[4]==1 else ""}
-    </div>
-    """
+    if "user_id" not in session: return redirect('/login')
+    with sqlite3.connect(DB) as con:
+        user = con.execute("SELECT * FROM users WHERE id=?", (session["user_id"],)).fetchone()
+    
+    # Bakiye kontrolü ve oyun başlatma
+    if 'elim' not in session:
+        con.execute("UPDATE users SET balance = balance - 100 WHERE id=?", (session["user_id"],))
+        eller = yeni_desteyi_dagit()
+        session['elim'], session['bot1'], session['bot2'], session['bot3'] = eller
+        session['masa'] = []
+    
+    return render_template_string(MASA_HTML, user=user, elim=session['elim'], masa=session['masa'], enumerate=enumerate)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/play_card/<int:idx>')
+def play_card(idx):
+    elim = session.get('elim', [])
+    if not elim: return redirect('/')
+    
+    kart = elim.pop(idx)
+    # Botlar da birer kart atar
+    b1, b2, b3 = session['bot1'].pop(0), session['bot2'].pop(0), session['bot3'].pop(0)
+    
+    session['elim'] = elim
+    session['masa'] = [kart, b1, b2, b3]
+    
+    if not elim: session.pop('elim') # Oyun bittiğinde sıfırla
+    return redirect('/')
+
+@app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        u, p = request.form['u'], request.form['p']
         with sqlite3.connect(DB) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM users WHERE username=? AND password=?", (u, p))
-            user = cur.fetchone()
+            user = con.execute("SELECT * FROM users WHERE username=? AND password=?", (request.form['u'], request.form['p'])).fetchone()
             if user:
                 session["user_id"] = user[0]
-                return redirect(url_for('home'))
-        return "Hatalı Giriş! <a href='/login'>Tekrar Dene</a>"
-    return '''<body style="text-align:center; font-family:sans-serif;"><h2>Giriş Yap</h2>
-    <form method="post">Kullanıcı: <input name="u"><br><br>Şifre: <input name="p" type="password"><br><br><button>Giriş</button></form>
-    <br><a href="/register">Kayıt Ol</a></body>'''
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        u, p = request.form['u'], request.form['p']
-        try:
-            with sqlite3.connect(DB) as con:
-                con.execute("INSERT INTO users(username,password) VALUES(?,?)", (u, p))
-            return "Kayıt Başarılı! <a href='/login'>Giriş yapın</a>"
-        except: return "Kullanıcı adı alınmış!"
-    return '<body style="text-align:center;"><h2>Kayıt Ol</h2><form method="post">Kullanıcı: <input name="u"><br><br>Şifre: <input name="p" type="password"><br><br><button>Kayıt Ol</button></form></body>'
-
-@app.route('/play')
-def play():
-    user = get_user()
-    if not user or user[3] < 100: return "Yetersiz bakiye! En az 100 TL gerekir. <a href='/'>Geri</a>"
-    
-    kazanan, detaylar = batak_motoru()
-    mesaj = f"Masa kuruldu: Siz, Mert, Selin, Caner.<br>Oyun bitti! <b>Kazanan: {kazanan}</b><br><br>"
-    for isim, el in detaylar.items():
-        mesaj += f"{isim}: {el} el aldı.<br>"
-
-    with sqlite3.connect(DB) as con:
-        if kazanan == "Siz":
-            con.execute("UPDATE users SET balance = balance + 200 WHERE id=?", (user[0],))
-            mesaj = "🎉 TEBRİKLER! 200 TL Kazandınız!<br>" + mesaj
-        else:
-            con.execute("UPDATE users SET balance = balance - 100 WHERE id=?", (user[0],))
-            mesaj = "😔 Kaybettiniz. 100 TL Bakiyenizden düştü.<br>" + mesaj
-    
-    return mesaj + "<br><a href='/play'>Tekrar Oyna</a> | <a href='/'>Ana Sayfa</a>"
-
-@app.route('/admin')
-def admin():
-    user = get_user()
-    if not user or user[4] != 1: return "Yetkisiz Erişim!"
-    with sqlite3.connect(DB) as con:
-        cur = con.cursor()
-        cur.execute("SELECT requests.id, users.username, requests.amount FROM requests JOIN users ON users.id = requests.user_id WHERE requests.status='pending'")
-        reqs = cur.fetchall()
-    html = "<h2>Admin Onay Paneli</h2>"
-    for r in reqs:
-        html += f"ID:{r[0]} | {r[1]} - {r[2]} TL <a href='/approve/{r[0]}'>[ONAYLA]</a><br>"
-    return html + "<br><a href='/'>Geri</a>"
-
-@app.route('/approve/<int:rid>')
-def approve(rid):
-    user = get_user()
-    if not user or user[4] != 1: return "Yetkisiz"
-    with sqlite3.connect(DB) as con:
-        cur = con.cursor()
-        cur.execute("SELECT user_id, amount FROM requests WHERE id=?", (rid,))
-        res = cur.fetchone()
-        if res:
-            con.execute("UPDATE users SET balance = balance + ? WHERE id=?", (res[1], res[0]))
-            con.execute("UPDATE requests SET status='approved' WHERE id=?", (rid,))
-    return redirect(url_for('admin'))
-
-@app.route('/request', methods=['GET', 'POST'])
-def request_money():
-    user = get_user()
-    if not user: return redirect(url_for('login'))
-    if request.method == 'POST':
-        amt = request.form['amt']
-        with sqlite3.connect(DB) as con:
-            con.execute("INSERT INTO requests(user_id, amount) VALUES(?,?)", (user[0], amt))
-        return "Talebiniz iletildi, admin onayı bekleniyor. <a href='/'>Geri</a>"
-    return '<h2>Bakiye Talebi</h2><form method="post">Miktar: <input name="amt"><button>Gönder</button></form>'
+                return redirect('/')
+    return '<form method="post">Admin: <input name="u"> Şifre: <input name="p" type="password"><button>Giriş</button></form>'
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect('/login')
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
