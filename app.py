@@ -2,20 +2,22 @@ import random, os
 from flask import Flask, render_template_string, redirect, request, session
 
 app = Flask(__name__)
-app.secret_key = "batak_vip_real_logic_2026"
+app.secret_key = "batak_vip_final_v3"
 
 # --- VERİ TABANI ---
 db = {"users": {"admin": {"ad": "Patron", "bakiye": 1000.0}}}
-BOT_ISIMLERI = ["Mert", "Selin", "Caner", "Ece", "Hakan", "Zeynep", "Emre", "Derya"]
+BOT_ISIMLERI = ["Mert", "Selin", "Caner", "Ece", "Hakan", "Zeynep"]
 
-# --- KART VE OYUN MOTORU ---
-def yeni_deste_ve_dagit():
+# --- KART SİSTEMİ ---
+def deste_olustur():
     suits = [('spade','♠'), ('heart','♥'), ('diamond','♦'), ('club','♣')]
     ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-    deste = [{'type': s[0], 'sym': s[1], 'val': r, 'power': i} for s in suits for i, r in enumerate(ranks)]
+    deste = []
+    for s_id, s_sym in suits:
+        for r_idx, r_val in enumerate(ranks):
+            deste.append({'type': s_id, 'sym': s_sym, 'val': r_val, 'power': r_idx})
     random.shuffle(deste)
-    # Sadece oyuncunun elini ve bot isimlerini döndür (Hafıza dostu)
-    return sorted(deste[:13], key=lambda x: (x['type'], x['power']))
+    return deste
 
 HTML = """
 <!DOCTYPE html>
@@ -24,57 +26,52 @@ HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background:#073d1a; color:white; font-family:sans-serif; margin:0; overflow:hidden; }
-        .header { background:#111; padding:10px; display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #fcd535; }
+        .header { background:#111; padding:10px; display:flex; justify-content:space-between; border-bottom:2px solid #fcd535; }
         .table { 
-            position:relative; width:95vw; height:60vh; margin:20px auto; 
+            position:relative; width:95vw; height:65vh; margin:15px auto; 
             background:radial-gradient(#155d27, #0a3316); border:8px solid #5d3a1a; border-radius:150px; 
             box-shadow: inset 0 0 50px #000;
         }
-        .player { position:absolute; text-align:center; width:80px; z-index:5; }
-        .p-top { top:15px; left:50%; transform:translateX(-50%); }
-        .p-left { left:15px; top:50%; transform:translateY(-50%); }
-        .p-right { right:15px; top:50%; transform:translateY(-50%); }
-        .p-bottom { bottom:15px; left:50%; transform:translateX(-50%); }
-        .avatar { background:#111; border:2px solid #fcd535; border-radius:50%; padding:8px; font-size:11px; font-weight:bold; }
+        .player { position:absolute; text-align:center; width:80px; }
+        .p-top { top:10px; left:50%; transform:translateX(-50%); }
+        .p-left { left:5px; top:50%; transform:translateY(-50%); }
+        .p-right { right:5px; top:50%; transform:translateY(-50%); }
+        .p-bottom { bottom:10px; left:50%; transform:translateX(-50%); }
+        .avatar { background:#111; border:2px solid #fcd535; border-radius:50%; padding:8px; font-size:10px; }
         
-        .arena { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:200px; height:150px; }
-        .played-card { position:absolute; width:45px; height:70px; background:white; color:black; border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; border:1px solid #000; }
-        /* Kartların Masadaki Pozisyonları */
+        .arena { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:180px; height:130px; }
+        .played-card { position:absolute; width:40px; height:60px; background:white; color:black; border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; border:1px solid #000; font-size:12px; }
         .pos-bottom { bottom:0; left:50%; transform:translateX(-50%); }
         .pos-top { top:0; left:50%; transform:translateX(-50%); }
         .pos-left { left:0; top:50%; transform:translateY(-50%); }
         .pos-right { right:0; top:50%; transform:translateY(-50%); }
 
-        .hand { position:fixed; bottom:15px; width:100%; display:flex; justify-content:center; gap:4px; padding:0 10px; box-sizing:border-box; }
-        .card { 
-            width:42px; height:65px; background:white; color:black; border-radius:5px; border:1px solid #999; 
-            display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; cursor:pointer; font-size:12px;
-        }
-        .card:hover { transform:translateY(-15px); border:2px solid #fcd535; }
+        .hand { position:fixed; bottom:15px; width:100%; display:flex; justify-content:center; gap:3px; flex-wrap:nowrap; overflow-x:auto; padding-bottom:10px; }
+        .card { width:40px; height:60px; background:white; color:black; border-radius:5px; border:1px solid #999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; cursor:pointer; font-size:12px; flex-shrink:0; }
+        .card:hover { transform:translateY(-10px); border:2px solid #fcd535; }
         .spade, .club { color:black; } .heart, .diamond { color:red; }
         
         .overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
-        .btn-gold { background:#fcd535; color:black; border:none; padding:15px 30px; border-radius:50px; font-weight:bold; cursor:pointer; text-decoration:none; }
+        .btn { background:#fcd535; color:black; border:none; padding:15px 30px; border-radius:50px; font-weight:bold; cursor:pointer; text-decoration:none; }
     </style>
 </head>
 <body>
     {% if not session.user %}
         <div class="overlay">
             <h2 style="color:#fcd535">💎 CASINO VIP BATAK</h2>
-            <form action="/login" method="post"><input type="text" name="u" placeholder="Kullanıcı Adı" required style="padding:15px; border-radius:10px;"><br><br><button class="btn-gold">GİRİŞ</button></form>
+            <form action="/login" method="post"><input type="text" name="u" placeholder="Adınız" required style="padding:15px; border-radius:10px;"><br><br><button class="btn">GİRİŞ</button></form>
         </div>
     {% elif not session.in_game %}
         <div class="overlay">
-            <h3 style="color:#fcd535">MASA BAHİSİ: 20 €</h3>
-            <p>Rakipler: {{ session.bots|join(', ') }}</p>
-            <a href="/start" class="btn-gold">BAHİSİ YATIR VE BAŞLA</a>
+            <h3 style="color:#fcd535">BAHİS: 20 €</h3>
+            <a href="/start" class="btn">OYUNA BAŞLA</a>
         </div>
     {% endif %}
 
     <div class="header">
         <span>👤 {{ session.user }}</span>
-        <span style="color:#fcd535; font-weight:bold;">💰 {{ bakiye }} €</span>
-        <a href="/logout" style="color:red; text-decoration:none; font-size:12px;">MASADAN KALK</a>
+        <span style="color:#fcd535">💰 {{ bakiye }} €</span>
+        <a href="/logout" style="color:red; text-decoration:none; font-size:12px;">ÇIK</a>
     </div>
 
     <div class="table">
@@ -107,7 +104,7 @@ HTML = """
 def index():
     u = session.get("user")
     if not u: return render_template_string(HTML)
-    b = db["users"][u]["bakiye"]
+    b = db["users"].get(u, {"bakiye": 0})["bakiye"]
     return render_template_string(HTML, bakiye=b)
 
 @app.route('/login', methods=['POST'])
@@ -125,7 +122,9 @@ def start():
     if db["users"][u]["bakiye"] < 20: return "Yetersiz Bakiye"
     db["users"][u]["bakiye"] -= 20
     session["in_game"] = True
-    session["hand"] = yeni_deste_ve_dagit()
+    deste = deste_olustur()
+    # Kartları türlerine göre (Maça-Kupa-Karo-Sinek) ve gücüne göre diz
+    session["hand"] = sorted(deste[:13], key=lambda x: (x['type'], x['power']))
     session["arena"] = []
     return redirect('/')
 
@@ -134,29 +133,19 @@ def play(idx):
     hand = session.get("hand", [])
     if not hand or idx >= len(hand): return redirect('/')
     
-    # 1. Oyuncunun (SİZ) kartı
+    # Senin kartın
     player_card = hand.pop(idx)
     session["hand"] = hand
     
-    # 2. Botlar sırayla kart atar (Gerçek Batak Mantığı: Aynı türden veya rastgele)
-    suits = [('spade','♠'), ('heart','♥'), ('diamond','♦'), ('club','♣')]
-    ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-    
-    def random_card():
-        s = random.choice(suits)
-        r = random.choice(ranks)
-        return {'type': s[0], 'sym': s[1], 'val': r, 'power': ranks.index(r)}
-
-    # Masayı kur
+    # Botlar elindeki kartı atıyor
+    deste = deste_olustur() # Botlara rastgele kart ataması
     arena = [
         {'pos': 'bottom', 'card': player_card},
-        {'pos': 'top', 'card': random_card()},
-        {'pos': 'left', 'card': random_card()},
-        {'pos': 'right', 'card': random_card()}
+        {'pos': 'top', 'card': deste[14]},
+        {'pos': 'left', 'card': deste[15]},
+        {'pos': 'right', 'card': deste[16]}
     ]
-    
     session["arena"] = arena
-    # Not: Gerçek batakta burada "eli kim kazandı" hesabı yapılır, bir sonraki adımda ekleyebiliriz.
     return redirect('/')
 
 @app.route('/logout')
