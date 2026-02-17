@@ -2,7 +2,7 @@ import random, os
 from flask import Flask, render_template_string, redirect, request, session, jsonify
 
 app = Flask(__name__)
-app.secret_key = "casino724_sweet_bonanza_beta"
+app.secret_key = "casino724_svg_edition"
 
 # --- VERİ TABANI ---
 db = {
@@ -11,31 +11,24 @@ db = {
     "bakiye_talepleri": []
 }
 
-# --- SWEET BONANZA İÇİN GERÇEK SEMBOLLER VE AYARLAR ---
-# Sweet Bonanza'nın 6x5 ızgarasına uygun hale getirilmiştir.
-# Her sembol için direkt görsel linki kullanılmıştır.
-OYUN_DATA = {
-    "Sweet Bonanza": {
-        "s": [
-            "https://i.imgur.com/K5m5h7G.png", # Kırmızı Kalp Şeker
-            "https://i.imgur.com/X0S3B7r.png", # Mor Kare Şeker
-            "https://i.imgur.com/G4P4Q2U.png", # Yeşil Elmas Şeker
-            "https://i.imgur.com/H1J1p1x.png", # Mavi Oval Şeker
-            "https://i.imgur.com/L7E7k7u.png", # Elma
-            "https://i.imgur.com/P2N2o2y.png", # Erik
-            "https://i.imgur.com/R3S3p3t.png", # Karpuz
-            "https://i.imgur.com/T4U4v4w.png"  # Muz
-        ],
-        "rows": 5, "cols": 6, # 6x5 Izgara = 30 sembol
-        "c1": "#ff75bd", "c2": "#ffafbd", # Arka plan renkleri
-        "win_text": "🍬 BÜYÜK KAZANÇ!"
-    }
+# --- OYUN AYARLARI ---
+# Semboller SVG (kod) olarak tanımlandı, asla kırılmaz!
+SYMBOLS = {
+    "red_heart": '<svg viewBox="0 0 100 100"><path d="M50 85l-5-5C20 55 5 40 5 25 5 15 13 7 23 7c6 0 12 3 16 8 4-5 10-8 16-8 10 0 18 8 18 18 0 15-15 30-40 55l-3 3z" fill="#ff004c"/></svg>',
+    "purple_square": '<svg viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" rx="15" fill="#a020f0"/></svg>',
+    "green_diamond": '<svg viewBox="0 0 100 100"><path d="M50 10L10 50L50 90L90 50Z" fill="#00ff00"/></svg>',
+    "blue_oval": '<svg viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="40" ry="30" fill="#0000ff"/></svg>',
+    "yellow_banana": '<svg viewBox="0 0 100 100"><path d="M20 20C40 20 80 40 80 80C60 80 20 60 20 20" fill="#ffe135"/></svg>',
+    "lollipop": '<svg viewBox="0 0 100 100"><circle cx="50" cy="40" r="30" fill="url(#grad)"/><rect x="45" y="70" width="10" height="25" fill="#fff"/><defs><radialGradient id="grad"><stop offset="10%" stop-color="white"/><stop offset="100%" stop-color="#ff0080"/></radialGradient></defs></svg>'
 }
 
-OYUNLAR = [
-    {"ad": "Sweet Bonanza", "img": "https://i.imgur.com/s6n5o5k.png"}, # Sweet Bonanza logosu
-    # Diğer oyunlar şimdilik yok, sadece Sweet Bonanza odaklıyız
-]
+OYUN_DATA = {
+    "Sweet Bonanza": {
+        "s": list(SYMBOLS.keys()),
+        "rows": 5, "cols": 6,
+        "c1": "#ff75bd", "c2": "#ffafbd"
+    }
+}
 
 HTML = """
 <!DOCTYPE html>
@@ -45,46 +38,34 @@ HTML = """
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @keyframes flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        body { background:#0a0b0d; color:white; font-family:sans-serif; margin:0; transition: background 1s ease; }
+        body { background:#0a0b0d; color:white; font-family:sans-serif; margin:0; }
         .header { background:#fcd535; color:black; text-align:center; padding:15px; font-weight:bold; }
-        .card { background:rgba(22, 24, 28, 0.8); margin:10px; padding:15px; border-radius:12px; border:1px solid #333; backdrop-filter: blur(5px); }
-        .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px; }
-        .game-card { background:#1c1f26; border-radius:15px; overflow:hidden; border:1px solid #444; cursor:pointer; }
-        .game-card img { width:100%; height:130px; object-fit:cover; }
+        .card { background:rgba(22, 24, 28, 0.9); margin:10px; padding:15px; border-radius:12px; border:1px solid #333; }
         
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1000; flex-direction:column; align-items:center; justify-content:center; }
         .slot-content { 
-            width:95%; max-width:550px; padding:20px; border-radius:30px; border:4px solid #fcd535; text-align:center;
-            background-size: 400% 400%; animation: flow 10s ease infinite; box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            width:95%; max-width:500px; padding:15px; border-radius:30px; border:4px solid #fcd535; text-align:center;
+            background-size: 400% 400%; animation: flow 10s ease infinite; 
         }
         .reels-grid { 
-            display:grid; 
-            grid-template-columns: repeat(var(--cols), 1fr); 
-            gap:5px; 
-            margin:20px auto;
-            width:fit-content; /* Izgaranın ortalanması için */
-            background:rgba(0,0,0,0.6);
-            padding:10px;
-            border-radius:15px;
-            border:1px solid rgba(255,255,255,0.1);
+            display:grid; grid-template-columns: repeat(6, 1fr); gap:5px; 
+            margin:15px auto; background:rgba(0,0,0,0.5); padding:10px; border-radius:15px;
         }
-        .reel-cell { 
-            width:60px; height:60px; 
-            display:flex; align-items:center; justify-content:center; 
-            font-size:30px; 
-            border-radius:8px; 
-            overflow:hidden;
-            transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+        .cell { 
+            width:100%; aspect-ratio: 1/1; display:flex; align-items:center; justify-content:center; 
+            background:rgba(255,255,255,0.1); border-radius:8px; transition: 0.3s;
         }
-        .reel-cell img { width:100%; height:100%; object-fit:contain; }
+        .cell svg { width:80%; height:80%; filter: drop-shadow(0 0 5px rgba(255,255,255,0.3)); }
+        .pop { transform: scale(0); opacity: 0; }
         
-        .btn-spin { background:#fcd535; color:black; border:none; padding:15px; border-radius:50px; font-weight:bold; width:100%; font-size:1.1rem; cursor:pointer; }
-        .nav { display:flex; background:#16181c; border-top:1px solid #333; position:fixed; bottom:0; width:100%; z-index:100; }
+        .btn-spin { background:#fcd535; color:black; border:none; padding:18px; border-radius:50px; font-weight:bold; width:100%; font-size:1.2rem; cursor:pointer; box-shadow: 0 5px 0 #b39700; }
+        .btn-spin:active { transform: translateY(3px); box-shadow: none; }
+        .nav { display:flex; background:#16181c; border-top:1px solid #333; position:fixed; bottom:0; width:100%; }
         .nav-item { flex:1; text-align:center; padding:15px; color:white; text-decoration:none; font-size:11px; }
     </style>
 </head>
 <body id="body-bg">
-    <div class="header">🎰 CASINO7-24 PROTOTYPE</div>
+    <div class="header">💎 CASINO7-24 VIP</div>
 
     {% if not session.user %}
         <div style="padding:40px; text-align:center;">
@@ -92,140 +73,91 @@ HTML = """
             <form action="/login" method="post">
                 <input type="text" name="u" placeholder="Kullanıcı Adı" required style="width:90%; padding:15px; margin:10px; background:#1c1f26; color:white; border:1px solid #444;">
                 <input type="password" name="p" placeholder="Şifre" required style="width:90%; padding:15px; margin:10px; background:#1c1f26; color:white; border:1px solid #444;">
-                <button name="act" value="in" class="btn-spin">GİRİŞ</button>
-                <button name="act" value="up" style="background:none; border:none; color:#aaa; margin-top:20px;">Kayıt Ol</button>
+                <button name="act" value="in" class="btn-spin">GİRİŞ YAP</button>
             </form>
         </div>
     {% else %}
         <div class="card" style="text-align:center;">
             <span style="color:#aaa;">BAKİYENİZ</span><br>
-            <b style="color:#0ecb81; font-size:30px;">{{ user.bakiye }} €</b>
+            <b style="color:#0ecb81; font-size:32px;">{{ user.bakiye }} €</b>
         </div>
 
-        {% if p == 'ADMIN' %}
-            <div style="padding:15px;"><h3>⚙️ PANEL</h3>
-            {% for b in db.basvurular %}<div class="card">{{ b.u }} <a href="/admin/onay/{{loop.index0}}" style="color:lime;">[ONAY]</a></div>{% endfor %}
-            {% for t in db.bakiye_talepleri %}<div class="card">{{ t.u }}: {{ t.amt }} € <a href="/admin/bakiye/{{loop.index0}}" style="color:lime;">[YÜKLE]</a></div>{% endfor %}
+        <div style="padding:10px;">
+            <div onclick="openGame('Sweet Bonanza')" style="background:linear-gradient(45deg, #ff75bd, #ffafbd); border-radius:20px; padding:30px; text-align:center; cursor:pointer; border:3px solid #fcd535;">
+                <h1 style="margin:0; text-shadow: 2px 2px 0 #ff0080;">SWEET BONANZA</h1>
+                <p>6x5 GRID • TUMBLE WIN</p>
             </div>
-        {% elif p == 'CASH' %}
-            <div style="padding:40px; text-align:center;">
-                <h3>💰 PARA YÜKLE</h3>
-                <form action="/talep" method="post"><input type="number" name="amt" placeholder="Miktar" required style="width:100%; padding:15px; background:black; color:white;">
-                <button class="btn-spin" style="margin-top:20px;">TALEP ET</button></form>
+        </div>
+
+        <div class="card" style="font-size:12px;">
+            <center><b>CANLI LİSTE</b></center>
+            {% for name, d in db.users.items() %}
+            <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #222;">
+                <span>{{ name }}</span><b>{{ d.bakiye }} €</b>
             </div>
-        {% else %}
-            <div class="grid">
-                {% for g in oyunlar %}
-                <div class="game-card" onclick="openGame('{{ g.ad }}')">
-                    <img src="{{ g.img }}"><div style="padding:8px; text-align:center; font-weight:bold;">{{ g.ad }}</div>
-                </div>
-                {% endfor %}
-            </div>
-            <div class="card" style="font-size:12px;">
-                <center><b>CANLI OYUNCULAR</b></center>
-                {% for name, d in db.users.items() %}<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #222;"><span>{{ name }}</span><b>{{ d.bakiye }} €</b></div>{% endfor %}
-            </div>
-        {% endif %}
+            {% endfor %}
+        </div>
 
         <div class="nav">
             <a href="/" class="nav-item">🎰 OYUNLAR</a>
-            <a href="/?p=CASH" class="nav-item">💰 KASA</a>
-            {% if user.role == 'ADMIN' %}<a href="/?p=ADMIN" class="nav-item">⚙️ PANEL</a>{% endif %}
             <a href="/logout" class="nav-item" style="color:red;">ÇIKIŞ</a>
         </div>
     {% endif %}
 
     <div id="modal">
         <div class="slot-content" id="m-bg">
-            <div style="display:flex; justify-content:space-between; margin-bottom:15px; background:rgba(0,0,0,0.4); padding:10px; border-radius:10px;">
-                <span id="m-title" style="font-weight:bold;">Oyun</span>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:rgba(0,0,0,0.6); padding:10px; border-radius:15px;">
+                <span id="m-title">Sweet Bonanza</span>
                 <span id="m-bal" style="color:#0ecb81; font-weight:bold;">{{ user.bakiye }} €</span>
             </div>
-            <div class="reels-grid" id="reels-box" style="--cols:6;"></div>
-            <p id="m-msg" style="height:25px; color:#fcd535; font-weight:bold; font-size:1.2rem; text-shadow: 0 0 10px black;"></p>
-            <button id="s-btn" class="btn-spin" onclick="spinNow()">SPIN ÇEVİR (10€)</button>
-            <button onclick="location.reload()" style="background:none; border:none; color:white; margin-top:20px; text-decoration:underline;">KAPAT</button>
+            <div class="reels-grid" id="reels-box"></div>
+            <div id="m-msg" style="height:30px; color:#fcd535; font-weight:bold; font-size:1.3rem;"></div>
+            <button id="s-btn" class="btn-spin" onclick="spinNow()">SPIN (10€)</button>
+            <button onclick="location.reload()" style="background:none; border:none; color:white; margin-top:15px; text-decoration:underline;">LOBİYE DÖN</button>
         </div>
     </div>
 
     <script>
-    let activeGame = "";
-    let gameSettings = {};
+    const SYMBOLS = {{ SYMBOLS|tojson }};
+    let activeGame = "Sweet Bonanza";
 
     function openGame(n){
-        activeGame = n;
-        document.getElementById('m-title').innerText = n;
         document.getElementById('modal').style.display = 'flex';
         fetch('/theme?n='+n).then(r=>r.json()).then(d=>{
-            gameSettings = d; // Oyun ayarlarını kaydet
             document.getElementById('m-bg').style.backgroundImage = `linear-gradient(-45deg, ${d.c1}, ${d.c2}, ${d.c1}, ${d.c2})`;
-            document.getElementById('body-bg').style.background = d.c1;
-            
             let box = document.getElementById('reels-box');
-            box.style.setProperty('--cols', d.cols); // CSS grid sütun sayısını ayarla
             box.innerHTML = "";
-            for(let i=0; i < d.rows * d.cols; i++){
-                box.innerHTML += `<div id="r${i}" class="reel-cell"><img src="${d.s[0]}"></div>`; // Başlangıç sembolü
-            }
+            for(let i=0; i<30; i++) box.innerHTML += `<div id="c${i}" class="cell">${SYMBOLS.red_heart}</div>`;
         });
     }
 
     async function spinNow(){
-        let res = await fetch('/spin', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'game='+activeGame});
-        let d = await res.json();
-        if(d.err){ alert(d.err); return; }
-        
         document.getElementById('s-btn').disabled = true;
-        document.getElementById('m-msg').innerText = "";
-        
-        let totalCells = gameSettings.rows * gameSettings.cols;
+        let res = await fetch('/spin', {method:'POST'});
+        let d = await res.json();
+        if(d.err) { alert(d.err); return; }
+
         let frames = 0;
         let timer = setInterval(()=>{
-            for(let j=0; j < totalCells; j++){
-                // Rastgele döner sembolleri göster
-                let randomSymbol = gameSettings.s[Math.floor(Math.random()*gameSettings.s.length)];
-                document.getElementById('r'+j).innerHTML = `<img src="${randomSymbol}">`;
+            for(let j=0; j<30; j++){
+                let keys = Object.keys(SYMBOLS);
+                document.getElementById('c'+j).innerHTML = SYMBOLS[keys[Math.floor(Math.random()*keys.length)]];
             }
-            if(frames++ > 15){ // Spin süresi
+            if(frames++ > 12){
                 clearInterval(timer);
-                for(let j=0; j < totalCells; j++){ 
-                    document.getElementById('r'+j).innerHTML = `<img src="${d.res[j]}">`;
-                }
+                d.res.forEach((s, i) => document.getElementById('c'+i).innerHTML = SYMBOLS[s]);
                 document.getElementById('m-bal').innerText = d.nb + " €";
                 
-                if(d.win > 0) {
-                    document.getElementById('m-msg').innerText = d.msg;
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                    // Basit bir "patlama" efekti simülasyonu
+                if(d.win > 0){
+                    confetti({ particleCount: 200, spread: 70, origin: { y: 0.6 } });
+                    document.getElementById('m-msg').innerText = "KAZANDIN: " + d.win + " €";
+                    // Patlama Efekti
                     setTimeout(()=>{
-                        for(let j=0; j < totalCells; j++){
-                            if(d.winning_cells && d.winning_cells.includes(j)){
-                                let cell = document.getElementById('r'+j);
-                                cell.style.transform = 'scale(0)';
-                                cell.style.opacity = '0';
-                            }
-                        }
-                        setTimeout(()=>{
-                             // Kazanan sembolleri kaldır ve yenilerini getir
-                            fetch('/spin', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'game='+activeGame+'&respin=true'})
-                            .then(r=>r.json())
-                            .then(new_d => {
-                                for(let j=0; j < totalCells; j++){
-                                    let cell = document.getElementById('r'+j);
-                                    cell.style.transform = 'scale(1)';
-                                cell.style.opacity = '1';
-                                    cell.innerHTML = `<img src="${new_d.res[j]}">`;
-                                }
-                                document.getElementById('m-bal').innerText = new_d.nb + " €";
-                                if(new_d.win > 0) {
-                                     document.getElementById('m-msg').innerText = new_d.msg + " (Respin!)";
-                                } else {
-                                     document.getElementById('m-msg').innerText = "";
-                                }
-                                document.getElementById('s-btn').disabled = false;
-                            });
-                        }, 500); // Semboller kaybolduktan sonra yeni semboller düşer
-                    }, 1000); // Patlama animasyonu süresi
+                        d.wins.forEach(idx => document.getElementById('c'+idx).classList.add('pop'));
+                        setTimeout(()=> {
+                             location.reload(); // Bakiyeyi güncellemek için
+                        }, 800);
+                    }, 1000);
                 } else {
                     document.getElementById('s-btn').disabled = false;
                 }
@@ -241,98 +173,42 @@ HTML = """
 def index():
     u = session.get("user")
     user_data = db["users"].get(u, {"bakiye": 0, "role": "USER"})
-    return render_template_string(HTML, db=db, user=user_data, oyunlar=OYUNLAR, p=request.args.get('p'), session=session)
+    return render_template_string(HTML, db=db, user=user_data, SYMBOLS=SYMBOLS, session=session)
 
 @app.route('/login', methods=['POST'])
 def login():
-    u, p, act = request.form.get('u'), request.form.get('p'), request.form.get('act')
-    if act == "in":
-        if u in db["users"] and db["users"][u]["pw"] == p: session["user"] = u
-    else:
-        db["basvurular"].append({"u": u, "p": p})
+    u = request.form.get('u')
+    if u in db["users"]: session["user"] = u
     return redirect('/')
-
-@app.route('/admin/onay/<int:id>')
-def admin_onay(id):
-    if session.get("user") == "admin":
-        b = db["basvurular"].pop(id)
-        db["users"][b['u']] = {"pw": b['p'], "ad": b['u'], "role": "USER", "bakiye": 100.0}
-    return redirect('/?p=ADMIN')
-
-@app.route('/talep', methods=['POST'])
-def talep():
-    u = session.get("user")
-    if u: db["bakiye_talepleri"].append({"u": u, "amt": float(request.form.get('amt'))})
-    return redirect('/')
-
-@app.route('/admin/bakiye/<int:id>')
-def admin_bakiye(id):
-    if session.get("user") == "admin":
-        t = db["bakiye_talepleri"].pop(id)
-        if t['u'] in db["users"]: db["users"][t['u']]["bakiye"] += t['amt']
-    return redirect('/?p=ADMIN')
 
 @app.route('/theme')
-def theme(): return jsonify(OYUN_DATA.get(request.args.get('n')))
+def theme(): return jsonify(OYUN_DATA["Sweet Bonanza"])
 
 @app.route('/spin', methods=['POST'])
 def spin():
     u = session.get("user")
-    if not u: return jsonify({"err": "Giriş yap!"})
-    game = request.form.get('game')
-    bet = 10.0
-    is_respin = request.form.get('respin') == 'true'
-
-    if not is_respin and db["users"][u]["bakiye"] < bet: return jsonify({"err": "Bakiye bitti!"})
-    if not is_respin: db["users"][u]["bakiye"] -= bet
+    if db["users"][u]["bakiye"] < 10: return jsonify({"err": "Bakiye bitti!"})
+    db["users"][u]["bakiye"] -= 10
     
-    data = OYUN_DATA[game]
-    total_cells = data["rows"] * data["cols"]
+    # 6x5 Izgara üretimi
+    res = [random.choice(list(SYMBOLS.keys())) for _ in range(30)]
     
-    # Kazanma mantığı (Basitçe 8 aynı sembolü yakalamak)
-    # Sweet Bonanza'da "pay anywhere" olduğu için 8+ aynı sembol aranır.
-    is_win = random.random() < 0.25 # %25 Kazanma Şansı
+    # Kazanma kontrolü (8+ aynı sembol)
+    counts = {}
+    for s in res: counts[s] = counts.get(s, 0) + 1
     
-    final_reels = []
-    winning_cells = []
     win_amt = 0
-
-    if is_win:
-        # Rastgele 8-15 arası aynı sembol üret
-        winning_symbol = random.choice(data["s"])
-        num_winning_symbols = random.randint(8, 15)
-        
-        # Tüm hücrelere rastgele sembolleri doldur
-        for _ in range(total_cells):
-            final_reels.append(random.choice(data["s"]))
-
-        # Kazanan sembolleri rastgele hücrelere yerleştir
-        for _ in range(num_winning_symbols):
-            idx = random.randint(0, total_cells - 1)
-            final_reels[idx] = winning_symbol
-            winning_cells.append(idx)
-        
-        win_amt = bet * random.choice([2, 5, 10, 20])
-        db["users"][u]["bakiye"] += win_amt
-    else:
-        # Kazanma yoksa tamamen rastgele semboller
-        for _ in range(total_cells):
-            final_reels.append(random.choice(data["s"]))
-        win_amt = 0
-        
-    return jsonify({
-        "res": final_reels, 
-        "win": win_amt, 
-        "nb": db["users"][u]["bakiye"], 
-        "msg": data["win_text"], 
-        "pool": data["s"], 
-        "cols": data["cols"],
-        "winning_cells": winning_cells # Kazanan hücreleri işaretlemek için
-    })
+    winning_indices = []
+    for s, count in counts.items():
+        if count >= 8:
+            win_amt += 10 * count
+            winning_indices = [i for i, x in enumerate(res) if x == s]
+            
+    db["users"][u]["bakiye"] += win_amt
+    return jsonify({"res": res, "win": win_amt, "nb": db["users"][u]["bakiye"], "wins": winning_indices})
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect('/')
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
