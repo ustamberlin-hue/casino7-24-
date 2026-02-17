@@ -1,30 +1,43 @@
-import random
-import os
-from datetime import datetime
+import random, os
 from flask import Flask, render_template_string, redirect, request, session, jsonify
 
 app = Flask(__name__)
-app.secret_key = "gokay_casino_empire_v3_premium"
+app.secret_key = "casino724_premium_key"
 
 # --- VERİ TABANI ---
 db = {
     "users": {
-        "admin": {"pw": "1234", "role": "ADMIN", "ad": "Patron", "bakiye": 1000000}
+        "admin": {"pw": "1234", "role": "ADMIN", "ad": "Patron", "bakiye": 1000.0} # Bakiyeni 1000 yaptım Patron!
     },
     "basvurular": [],
     "bakiye_talepleri": []
 }
 
-def format_euro(value):
-    return "{:,.2f} €".format(value).replace(",", "X").replace(".", ",").replace("X", ".")
+def format_euro(v): return "{:,.2f} €".format(v).replace(",", "X").replace(".", ",").replace("X", ".")
 
+# --- 20 POPÜLER OYUN LİSTESİ ---
 OYUNLAR = [
-    {"id": "sweet_bonanza", "ad": "Sweet Bonanza", "img": "https://i.ibb.co/L6V2MvL/slot3.jpg"},
-    {"id": "gates_olympus", "ad": "Gates of Olympus", "img": "https://i.ibb.co/f2PzC6z/slot2.jpg"},
-    {"id": "fruit_party", "ad": "Fruit Party", "img": "https://i.ibb.co/hZz00fV/slot1.jpg"},
-    {"id": "dog_house", "ad": "The Dog House", "img": "https://i.ibb.co/L6V2MvL/slot3.jpg"},
-    {"id": "sugar_rush", "ad": "Sugar Rush", "img": "https://i.ibb.co/f2PzC6z/slot2.jpg"}
-] # (20 oyun listesini görsel kartlar için kısa tuttum, hepsini ekleyebilirsin)
+    {"id": "s1", "ad": "Sweet Bonanza", "img": "https://img.freepik.com/premium-vector/casino-slot-machine-with-candy-icons_24908-62025.jpg"},
+    {"id": "s2", "ad": "Gates of Olympus", "img": "https://img.freepik.com/premium-vector/olympus-god-zeus-concept_23-2148618451.jpg"},
+    {"id": "s3", "ad": "Fruit Party", "img": "https://img.freepik.com/free-vector/set-fruit-icons-casino-slot-machine_24908-56540.jpg"},
+    {"id": "s4", "ad": "The Dog House", "img": "https://img.freepik.com/free-vector/dog-house-concept-illustration_114360-1043.jpg"},
+    {"id": "s5", "ad": "Sugar Rush", "img": "https://img.freepik.com/free-vector/candyland-concept-illustration_114360-1011.jpg"},
+    {"id": "s6", "ad": "Big Bass Bonanza", "img": "https://img.freepik.com/free-vector/fishing-concept-illustration_114360-1205.jpg"},
+    {"id": "s7", "ad": "Wild West Gold", "img": "https://img.freepik.com/free-vector/cowboy-concept-illustration_114360-1345.jpg"},
+    {"id": "s8", "ad": "Starlight Princess", "img": "https://img.freepik.com/free-vector/anime-princess-concept-illustration_114360-1456.jpg"},
+    {"id": "s9", "ad": "Wanted Dead or Wild", "img": "https://img.freepik.com/free-vector/wild-west-concept-illustration_114360-1567.jpg"},
+    {"id": "s10", "ad": "Buffalo King", "img": "https://img.freepik.com/free-vector/buffalo-concept-illustration_114360-1678.jpg"},
+    {"id": "s11", "ad": "Gems Bonanza", "img": "https://img.freepik.com/free-vector/gems-concept-illustration_114360-1789.jpg"},
+    {"id": "s12", "ad": "Madame Destiny", "img": "https://img.freepik.com/free-vector/fortune-teller-concept-illustration_114360-1890.jpg"},
+    {"id": "s13", "ad": "Joker Jewels", "img": "https://img.freepik.com/free-vector/joker-concept-illustration_114360-1901.jpg"},
+    {"id": "s14", "ad": "Fire Strike", "img": "https://img.freepik.com/free-vector/fire-concept-illustration_114360-2012.jpg"},
+    {"id": "s15", "ad": "Book of Dead", "img": "https://img.freepik.com/free-vector/egypt-concept-illustration_114360-2123.jpg"},
+    {"id": "s16", "ad": "Legacy of Egypt", "img": "https://img.freepik.com/free-vector/pharaoh-concept-illustration_114360-2234.jpg"},
+    {"id": "s17", "ad": "Wolf Gold", "img": "https://img.freepik.com/free-vector/wolf-concept-illustration_114360-2345.jpg"},
+    {"id": "s18", "ad": "Great Rhino", "img": "https://img.freepik.com/free-vector/rhino-concept-illustration_114360-2456.jpg"},
+    {"id": "s19", "ad": "Chilli Heat", "img": "https://img.freepik.com/free-vector/chilli-concept-illustration_114360-2567.jpg"},
+    {"id": "s20", "ad": "Mustang Gold", "img": "https://img.freepik.com/free-vector/horse-concept-illustration_114360-2678.jpg"}
+]
 
 HTML = """
 <!DOCTYPE html>
@@ -36,166 +49,147 @@ HTML = """
         .header { background:linear-gradient(90deg, #fcd535, #ffb800); color:black; text-align:center; padding:15px; font-weight:bold; }
         .card { background:#16181c; margin:10px; padding:15px; border-radius:12px; border:1px solid #333; }
         .grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:10px; }
-        .game-card { background:#1c1f26; border-radius:12px; overflow:hidden; border:1px solid #333; text-align:center; cursor:pointer; }
-        .game-card img { width:100%; height:100px; object-fit:cover; }
+        .game-card { background:#1c1f26; border-radius:12px; overflow:hidden; border:1px solid #444; text-align:center; cursor:pointer; }
+        .game-card img { width:100%; height:110px; object-fit:cover; display:block; }
         .btn { background:#fcd535; color:black; border:none; padding:12px; border-radius:8px; font-weight:bold; width:100%; cursor:pointer; }
-        .btn-red { background:#ff4444; color:white; }
-        .btn-green { background:#0ecb81; color:white; }
-        .input { width:100%; padding:12px; margin-bottom:10px; background:black; color:white; border:1px solid #333; border-radius:8px; box-sizing:border-box; }
-        .nav { display:flex; background:#16181c; border-top:1px solid #333; position:fixed; bottom:0; width:100%; }
+        .nav { display:flex; background:#16181c; border-top:1px solid #333; position:fixed; bottom:0; width:100%; z-index:99; }
         .nav-btn { flex:1; text-align:center; padding:15px; color:white; text-decoration:none; font-size:12px; }
-        #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1000; flex-direction:column; align-items:center; justify-content:center; }
+        #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; flex-direction:column; align-items:center; justify-content:center; }
+        .slot-box { background:#1c1f26; padding:20px; border-radius:20px; border:2px solid #fcd535; width:85%; max-width:400px; text-align:center; }
+        .reels { display:flex; justify-content:center; gap:10px; margin:20px 0; }
+        .reel { background:black; border:2px solid #444; width:70px; height:80px; display:flex; align-items:center; justify-content:center; font-size:40px; border-radius:10px; }
     </style>
 </head>
 <body>
-    <div class="header">🏢 GOKAYBETT CASINO LOBBY</div>
+    <div class="header">🎰 CASINO7-24 OFFICIAL</div>
 
     {% if not session.user %}
         <div style="padding:30px;">
-            {% if request.args.get('m') == 'kayit' %}
-                <h3>Üyelik Başvurusu</h3>
-                <form action="/islem/kayit" method="post">
-                    <input type="text" name="ad" placeholder="Ad Soyad" class="input" required>
-                    <input type="text" name="u" placeholder="Kullanıcı Adı" class="input" required>
-                    <input type="password" name="p" placeholder="Şifre" class="input" required>
-                    <button class="btn">BAŞVURU GÖNDER</button>
-                    <a href="/" style="color:#fcd535; display:block; text-align:center; margin-top:15px;">Giriş Yap</a>
-                </form>
-            {% else %}
-                <h3>Terminal Girişi</h3>
-                {% if request.args.get('e') %}<p style="color:red;">Hatalı giriş veya onay bekleyen üyelik!</p>{% endif %}
-                <form action="/islem/giris" method="post">
-                    <input type="text" name="u" placeholder="Kullanıcı Adı" class="input" required>
-                    <input type="password" name="p" placeholder="Şifre" class="input" required>
-                    <button class="btn">SİSTEME GİRİŞ</button>
-                    <a href="/?m=kayit" style="color:#fcd535; display:block; text-align:center; margin-top:15px;">Üyelik Başvurusu Yap</a>
-                </form>
-            {% endif %}
+            <h3>Giriş Yap</h3>
+            <form action="/login" method="post">
+                <input type="text" name="u" placeholder="Kullanıcı Adı" style="width:100%; padding:12px; margin-bottom:10px; background:black; color:white; border:1px solid #333;">
+                <input type="password" name="p" placeholder="Şifre" style="width:100%; padding:12px; margin-bottom:20px; background:black; color:white; border:1px solid #333;">
+                <button class="btn">GİRİŞ</button>
+            </form>
         </div>
     {% else %}
-        {% if p == 'ADMIN' and session.user == 'admin' %}
+        <div class="card" style="text-align:center; border-bottom:3px solid #0ecb81;">
+            BAKİYE: <b id="main-bal" style="color:#0ecb81; font-size:22px;">{{ fmt(bakiye) }}</b>
+        </div>
+
+        {% if p == 'ADMIN' %}
             <div style="padding:10px;">
-                <h3>Yönetim Paneli</h3>
-                <h4>Üyelik Bekleyenler</h4>
+                <h3>Panel</h3>
+                {% if not db.basvurular %} <p>Bekleyen başvuru yok.</p> {% endif %}
                 {% for b in db.basvurular %}
-                    <div class="card">
-                        {{ b.ad }} (@{{ b.u }})
-                        <div style="display:flex; gap:5px; margin-top:10px;">
-                            <a href="/admin/onay/{{ loop.index0 }}" class="btn btn-green">ONAY</a>
-                            <a href="/admin/red/{{ loop.index0 }}" class="btn btn-red">RED</a>
-                        </div>
-                    </div>
+                <div class="card">{{ b.u }} <a href="/onay/{{loop.index0}}" style="color:lime;">[ONAYLA]</a></div>
                 {% endfor %}
-                <h4>Bakiye Talepleri</h4>
-                {% for t in db.bakiye_talepleri %}
-                    <div class="card">
-                        {{ t.u }}: {{ t.m }} €
-                        <div style="display:flex; gap:5px; margin-top:10px;">
-                            <a href="/admin/b_onay/{{ loop.index0 }}" class="btn btn-green">YÜKLE</a>
-                            <a href="/admin/b_red/{{ loop.index0 }}" class="btn btn-red">İPTAL</a>
-                        </div>
-                    </div>
-                {% endfor %}
-                <h4>Aktif Üyeler</h4>
-                {% for u_name, u_info in db.users.items() %}
-                    <div class="card" style="font-size:12px;">
-                        <b>{{ u_info.ad }}</b> (@{{ u_name }}) - Bakiye: {{ u_info.bakiye }} €
-                    </div>
-                {% endfor %}
-            </div>
-        {% elif p == 'PROFIL' %}
-            <div class="card">
-                <h3>Hesap Ayarları</h3>
-                <p>Bakiyeniz: <b>{{ fmt(bakiye) }}</b></p>
-                <hr border="0.1">
-                <h4>Şifre Değiştir</h4>
-                <form action="/islem/sifre" method="post">
-                    <input type="password" name="p" placeholder="Yeni Şifre" class="input" required>
-                    <button class="btn">GÜNCELLE</button>
-                </form>
-                <hr border="0.1">
-                <h4>Bakiye Talep Et</h4>
-                <form action="/islem/bakiye_iste" method="post">
-                    <input type="number" name="m" placeholder="Miktar €" class="input" required>
-                    <button class="btn btn-green">TALEP GÖNDER</button>
-                </form>
             </div>
         {% else %}
-            <div class="card" style="text-align:center; border-left:4px solid #fcd535;">
-                BAKİYE: <b style="color:#0ecb81; font-size:20px;">{{ fmt(bakiye) }}</b>
-            </div>
             <div class="grid">
                 {% for g in oyunlar %}
-                <div class="game-card" onclick="alert('Oyun Başlatılıyor: {{g.ad}}')">
-                    <img src="{{ g.img }}">
-                    <div style="padding:5px; font-size:11px;">{{ g.ad }}</div>
+                <div class="game-card" onclick="openSlot('{{ g.ad }}')">
+                    <img src="{{ g.img }}" onerror="this.src='https://via.placeholder.com/150/1c1f26/fcd535?text=Casino+Game'">
+                    <div style="padding:8px; font-size:12px; font-weight:bold;">{{ g.ad }}</div>
                 </div>
                 {% endfor %}
             </div>
         {% endif %}
 
+        <div id="modal">
+            <div class="slot-box">
+                <h2 id="st" style="color:#fcd535; margin-top:0;">Oyun</h2>
+                <div class="reels">
+                    <div id="r1" class="reel">🍒</div><div id="r2" class="reel">🍋</div><div id="r3" class="reel">💎</div>
+                </div>
+                <select id="bet" style="width:100%; padding:10px; margin-bottom:10px; background:black; color:white; border:1px solid #444;">
+                    <option value="1">1.00 €</option><option value="5" selected>5.00 €</option><option value="10">10.00 €</option>
+                </select>
+                <button id="sb" class="btn" onclick="spin()">SPIN ÇEVİR</button>
+                <button onclick="document.getElementById('modal').style.display='none'" style="background:none; border:none; color:#777; margin-top:15px; cursor:pointer;">Kapat</button>
+            </div>
+        </div>
+
         <div class="nav">
             <a href="/" class="nav-btn">🎰 OYUNLAR</a>
-            <a href="/p/PROFIL" class="nav-btn">👤 PROFİL</a>
-            {% if session.user == 'admin' %}<a href="/p/ADMIN" class="nav-btn" style="color:#fcd535;">⚙️ PANEL</a>{% endif %}
+            <a href="/?p=ADMIN" class="nav-btn">⚙️ PANEL</a>
             <a href="/logout" class="nav-btn" style="color:red;">ÇIKIŞ</a>
         </div>
     {% endif %}
+
+    <script>
+    function openSlot(n){ document.getElementById('st').innerText=n; document.getElementById('modal').style.display='flex'; }
+    async function spin(){
+        let b = document.getElementById('bet').value;
+        let res = await fetch('/spin', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'bet='+b});
+        let d = await res.json();
+        if(d.error){ alert(d.error); return; }
+        document.getElementById('sb').disabled = true;
+        let syms = ["🍒","🍋","💎","7️⃣","🍉"];
+        let count = 0;
+        let iv = setInterval(()=>{
+            document.getElementById('r1').innerText=syms[Math.floor(Math.random()*5)];
+            document.getElementById('r2').innerText=syms[Math.floor(Math.random()*5)];
+            document.getElementById('r3').innerText=syms[Math.floor(Math.random()*5)];
+            if(count++ > 12){
+                clearInterval(iv);
+                document.getElementById('r1').innerText=d.r[0];
+                document.getElementById('r2').innerText=d.r[1];
+                document.getElementById('r3').innerText=d.r[2];
+                document.getElementById('main-bal').innerText=d.nb;
+                document.getElementById('sb').disabled = false;
+                if(d.w > 0) alert("TEBRİKLER! "+d.w+" € KAZANDIN!");
+            }
+        }, 80);
+    }
+    </script>
 </body>
 </html>
 """
 
 @app.route('/')
-@app.route('/p/<p>')
-def index(p='LOBBY'):
+def index():
     u = session.get("user")
     u_data = db["users"].get(u, {"bakiye":0})
-    return render_template_string(HTML, p=p, bakiye=u_data['bakiye'], oyunlar=OYUNLAR, db=db, fmt=format_euro)
+    return render_template_string(HTML, p=request.args.get('p'), bakiye=u_data['bakiye'], oyunlar=OYUNLAR, db=db, fmt=format_euro)
 
-@app.route('/islem/<aksiyon>', methods=['POST'])
-def islem(aksiyon):
-    if aksiyon == "giris":
-        u, p = request.form.get('u', '').lower(), request.form.get('p')
-        if u in db["users"] and db["users"][u]["pw"] == p:
-            session["user"] = u
-            return redirect('/')
-        return redirect('/?e=1')
-    
-    if aksiyon == "kayit":
-        u = request.form.get('u', '').lower()
-        if u in db["users"] or any(b['u'] == u for b in db["basvurular"]):
-            return "Bu kullanıcı adı zaten alınmış!"
-        db["basvurular"].append({"u": u, "p": request.form.get('p'), "ad": request.form.get('ad')})
-        return "Başvurunuz alındı, admin onayı bekleniyor."
-
-    if session.get("user"):
-        u = session["user"]
-        if aksiyon == "sifre":
-            db["users"][u]["pw"] = request.form.get('p')
-        elif aksiyon == "bakiye_iste":
-            db["bakiye_talepleri"].append({"u": u, "m": float(request.form.get('m', 0))})
+@app.route('/login', methods=['POST'])
+def login():
+    u, p = request.form.get('u'), request.form.get('p')
+    if u in db["users"] and db["users"][u]["pw"] == p: session["user"] = u
     return redirect('/')
 
-@app.route('/admin/<aksiyon>/<int:id>')
-def admin_islem(aksiyon, id):
-    if session.get("user") == "admin":
-        if aksiyon == "onay":
-            b = db["basvurular"].pop(id)
-            db["users"][b['u']] = {"pw": b['p'], "ad": b['ad'], "bakiye": 0}
-        elif aksiyon == "red":
-            db["basvurular"].pop(id)
-        elif aksiyon == "b_onay":
-            t = db["bakiye_talepleri"].pop(id)
-            if t['u'] in db["users"]: db["users"][t['u']]["bakiye"] += t['m']
-        elif aksiyon == "b_red":
-            db["bakiye_talepleri"].pop(id)
-    return redirect('/p/ADMIN')
+@app.route('/spin', methods=['POST'])
+def spin():
+    u = session.get("user")
+    if not u: return jsonify({"error": "Giriş yapmalısınız!"})
+    bet = float(request.form.get('bet', 0))
+    if db["users"][u]["bakiye"] < bet: return jsonify({"error": "Bakiye Yetersiz!"})
+    
+    db["users"][u]["bakiye"] -= bet
+    is_win = random.random() < 0.25 # Kasa her zaman avantajlı
+    win_amt = 0
+    syms = ["🍒", "🍋", "💎", "7️⃣", "🍉"]
+    
+    if is_win:
+        s = random.choice(syms)
+        reels = [s, s, s]
+        win_amt = bet * random.choice([2, 5, 10])
+        db["users"][u]["bakiye"] += win_amt
+    else:
+        reels = random.sample(syms, 3)
+        
+    return jsonify({"r": reels, "w": win_amt, "nb": format_euro(db["users"][u]["bakiye"])})
+
+@app.route('/onay/<int:id>')
+def onay(id):
+    if session.get("user") == "admin" and len(db["basvurular"]) > id:
+        b = db["basvurular"].pop(id)
+        db["users"][b['u']] = {"pw": b['p'], "ad": b['u'], "bakiye": 0}
+    return redirect('/?p=ADMIN')
 
 @app.route('/logout')
-def logout():
-    session.clear()
-    return redirect('/')
-
+def logout(): session.clear(); return redirect('/')
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
