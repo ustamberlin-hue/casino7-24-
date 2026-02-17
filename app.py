@@ -1,227 +1,152 @@
-from flask import Flask, request, redirect, session, render_template_string
-import sqlite3
-import os
+import random, os
+from flask import Flask, render_template_string, redirect, request, session, jsonify
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "batak_vip_exclusive_2026"
 
-DB = "site.db"
+# --- VERİ TABANI ---
+db = {
+    "users": {"admin": {"pw": "1234", "ad": "Patron", "bakiye": 1000.0}},
+}
 
-# ---------------- DB ----------------
-def init_db():
-    with sqlite3.connect(DB) as con:
-        cur = con.cursor()
+BOT_ISIMLERI = ["Mert", "Selin", "Caner", "Ece", "Hakan", "Zeynep", "Volkan", "Buse", "Emre", "Derya"]
 
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            balance INTEGER DEFAULT 0,
-            is_admin INTEGER DEFAULT 0
-        )
-        """)
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background:#073d1a; color:white; font-family:sans-serif; margin:0; overflow:hidden; }
+        .header { background:#111; padding:10px; display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #fcd535; }
+        
+        /* Batak Masası Görseli */
+        .table-area { 
+            position:relative; width:95vw; height:70vh; margin:20px auto; 
+            background:radial-gradient(#155d27, #0a3316); border:10px solid #5d3a1a; border-radius:150px; 
+            box-shadow: inset 0 0 50px #000;
+        }
+        
+        .player { position:absolute; text-align:center; width:80px; }
+        .p-top { top:-10px; left:50%; transform:translateX(-50%); }
+        .p-left { left:-10px; top:50%; transform:translateY(-50%); }
+        .p-right { right:-10px; top:50%; transform:translateY(-50%); }
+        .p-bottom { bottom:-10px; left:50%; transform:translateX(-50%); }
+        
+        .avatar { width:60px; height:60px; background:#111; border:2px solid #fcd535; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; }
+        
+        .cards-hand { position:fixed; bottom:20px; width:100%; display:flex; justify-content:center; gap:5px; }
+        .card { 
+            width:45px; height:70px; background:white; color:black; border-radius:5px; 
+            border:1px solid #999; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            font-weight:bold; cursor:pointer; font-size:14px; transition:0.2s;
+        }
+        .card:hover { transform:translateY(-15px); border-color:#fcd535; }
+        .spade { color:black; } .heart { color:red; } .diamond { color:blue; } .club { color:green; }
 
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            amount INTEGER,
-            status TEXT DEFAULT 'pending'
-        )
-        """)
+        .bet-overlay { 
+            position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); 
+            display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100;
+        }
+        .btn-gold { background:#fcd535; color:black; border:none; padding:15px 30px; border-radius:50px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
+    </style>
+</head>
+<body>
 
-init_db()
+    {% if not session.user %}
+        <div class="bet-overlay">
+            <h2>💎 CASINO BATAK VIP</h2>
+            <form action="/login" method="post" style="text-align:center;">
+                <input type="text" name="u" placeholder="Kullanıcı Adı" required style="padding:15px; border-radius:10px; border:none; width:200px;"><br><br>
+                <button class="btn-gold">MASAYA OTUR</button>
+            </form>
+        </div>
+    {% else %}
+        <div class="header">
+            <span>👤 {{ session.user }}</span>
+            <span style="color:#fcd535; font-weight:bold;">BAKİYE: {{ user.bakiye }} €</span>
+            <a href="/logout" style="color:red; text-decoration:none; font-size:12px;">MASADAN KALK</a>
+        </div>
 
-# ---------------- HELPERS ----------------
-def get_user():
-    if "user_id" in session:
-        with sqlite3.connect(DB) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM users WHERE id=?", (session["user_id"],))
-            return cur.fetchone()
-    return None
+        {% if not session.in_game %}
+        <div class="bet-overlay">
+            <h3>OYUN BAHİSİ: 20 €</h3>
+            <p>Rakipler Hazır, Masa Seni Bekliyor.</p>
+            <a href="/start_game"><button class="btn-gold">BAHİSİ YATIR VE BAŞLA</button></a>
+        </div>
+        {% endif %}
 
-# ---------------- REGISTER ----------------
-@app.route("/register", methods=["GET","POST"])
-def register():
-    if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+        <div class="table-area">
+            <div class="player p-top"><div class="avatar">{{ session.botlar[0] }}</div></div>
+            <div class="player p-left"><div class="avatar">{{ session.botlar[1] }}</div></div>
+            <div class="player p-right"><div class="avatar">{{ session.botlar[2] }}</div></div>
+            <div class="player p-bottom"><div class="avatar">SİZ</div></div>
+            
+            <div id="table-center" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; gap:10px;">
+                <div class="card" style="opacity:0.5;">?</div>
+                <div class="card" style="opacity:0.5;">?</div>
+            </div>
+        </div>
 
-        try:
-            with sqlite3.connect(DB) as con:
-                con.execute("INSERT INTO users(username,password) VALUES(?,?)",(u,p))
-            return "Kayıt başarılı <a href='/login'>Giriş</a>"
-        except:
-            return "Kullanıcı var"
+        <div class="cards-hand">
+            {% for card in hand %}
+            <div class="card {{ card.type }}" onclick="alert('Oyun Sırası Bekleniyor...')">
+                <span>{{ card.val }}</span>
+                <span>{{ card.symbol }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 
-    return """
-    <h2>Kayıt</h2>
-    <form method=post>
-    Kullanıcı: <input name=username><br>
-    Şifre: <input name=password type=password><br>
-    <button>Kayıt</button>
-    </form>
-    """
+    <script>
+        // Buraya ileride kart atma animasyonlarını ekleyeceğiz
+    </script>
+</body>
+</html>
+"""
 
-# ---------------- LOGIN ----------------
-@app.route("/login", methods=["GET","POST"])
+@app.route('/')
+def index():
+    u = session.get("user")
+    user_data = db["users"].get(u, {"bakiye": 0})
+    hand = session.get("hand", [])
+    return render_template_string(HTML, user=user_data, hand=hand)
+
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+    u = request.form.get('u')
+    session["user"] = u
+    if u not in db["users"]:
+        db["users"][u] = {"pw": "123", "bakiye": 100.0}
+    # Her girişte bot isimlerini değiştir
+    session["botlar"] = random.sample(BOT_ISIMLERI, 3)
+    session["in_game"] = False
+    return redirect('/')
 
-        with sqlite3.connect(DB) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM users WHERE username=? AND password=?", (u,p))
-            user = cur.fetchone()
+@app.route('/start_game')
+def start_game():
+    u = session.get("user")
+    if db["users"][u]["bakiye"] < 20:
+        return "Bakiye Yetersiz!"
+    
+    db["users"][u]["bakiye"] -= 20
+    session["in_game"] = True
+    
+    # Kartları Dağıt (Basit görsel hazırlık)
+    tipler = [('spade','♠'), ('heart','♥'), ('diamond','♦'), ('club','♣')]
+    degerler = ['7','8','9','10','J','Q','K','A']
+    hand = []
+    for _ in range(13):
+        t = random.choice(tipler)
+        hand.append({'type': t[0], 'symbol': t[1], 'val': random.choice(degerler)})
+    
+    session["hand"] = hand
+    return redirect('/')
 
-            if user:
-                session["user_id"] = user[0]
-                return redirect("/")
-            else:
-                return "Hatalı giriş"
-
-    return """
-    <h2>Giriş</h2>
-    <form method=post>
-    Kullanıcı: <input name=username><br>
-    Şifre: <input name=password type=password><br>
-    <button>Giriş</button>
-    </form>
-    """
-
-# ---------------- LOGOUT ----------------
-@app.route("/logout")
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect('/')
 
-# ---------------- HOME ----------------
-@app.route("/")
-def home():
-    user = get_user()
-    if not user:
-        return redirect("/login")
-
-    return f"""
-    <h2>Hoşgeldin {user[1]}</h2>
-    Bakiye: {user[3]} <br><br>
-
-    <a href='/request'>Bakiye iste</a><br>
-    <a href='/myrequests'>İsteklerim</a><br>
-    {'<a href="/admin">ADMIN PANEL</a><br>' if user[4]==1 else ''}
-    <a href='/logout'>Çıkış</a>
-    """
-
-# ---------------- REQUEST BALANCE ----------------
-@app.route("/request", methods=["GET","POST"])
-def request_balance():
-    user = get_user()
-    if not user:
-        return redirect("/login")
-
-    if request.method == "POST":
-        amount = int(request.form["amount"])
-
-        with sqlite3.connect(DB) as con:
-            con.execute("INSERT INTO requests(user_id,amount) VALUES(?,?)",(user[0],amount))
-
-        return "İstek gönderildi <a href='/'>Geri</a>"
-
-    return """
-    <h2>Bakiye İste</h2>
-    <form method=post>
-    Miktar: <input name=amount><br>
-    <button>Gönder</button>
-    </form>
-    """
-
-# ---------------- MY REQUESTS ----------------
-@app.route("/myrequests")
-def my_requests():
-    user = get_user()
-    if not user:
-        return redirect("/login")
-
-    with sqlite3.connect(DB) as con:
-        cur = con.cursor()
-        cur.execute("SELECT * FROM requests WHERE user_id=?", (user[0],))
-        rows = cur.fetchall()
-
-    html = "<h2>İsteklerim</h2>"
-    for r in rows:
-        html += f"""
-        ID:{r[0]} | {r[2]} | {r[3]}
-        {'<a href="/cancel/'+str(r[0])+'">İptal</a>' if r[3]=='pending' else ''}
-        <br>
-        """
-    return html + "<br><a href='/'>Geri</a>"
-
-# ---------------- CANCEL REQUEST ----------------
-@app.route("/cancel/<int:rid>")
-def cancel(rid):
-    user = get_user()
-    if not user:
-        return redirect("/login")
-
-    with sqlite3.connect(DB) as con:
-        con.execute("DELETE FROM requests WHERE id=? AND user_id=?", (rid,user[0]))
-
-    return redirect("/myrequests")
-
-# ---------------- ADMIN PANEL ----------------
-@app.route("/admin")
-def admin():
-    user = get_user()
-    if not user or user[4] != 1:
-        return "Yetkisiz"
-
-    with sqlite3.connect(DB) as con:
-        cur = con.cursor()
-        cur.execute("""
-        SELECT requests.id, users.username, requests.amount, requests.status, users.id
-        FROM requests
-        JOIN users ON users.id = requests.user_id
-        """)
-        rows = cur.fetchall()
-
-    html = "<h2>ADMIN PANEL</h2>"
-    for r in rows:
-        html += f"""
-        ID:{r[0]} | Kullanıcı:{r[1]} | Miktar:{r[2]} | {r[3]}
-        <a href='/approve/{r[0]}/{r[4]}/{r[2]}'>Onay</a>
-        <a href='/deny/{r[0]}'>Red</a>
-        <br>
-        """
-    return html + "<br><a href='/'>Geri</a>"
-
-# ---------------- APPROVE ----------------
-@app.route("/approve/<int:rid>/<int:uid>/<int:amount>")
-def approve(rid, uid, amount):
-    user = get_user()
-    if not user or user[4] != 1:
-        return "Yetkisiz"
-
-    with sqlite3.connect(DB) as con:
-        con.execute("UPDATE requests SET status='approved' WHERE id=?", (rid,))
-        con.execute("UPDATE users SET balance = balance + ? WHERE id=?", (amount, uid))
-
-    return redirect("/admin")
-
-# ---------------- DENY ----------------
-@app.route("/deny/<int:rid>")
-def deny(rid):
-    user = get_user()
-    if not user or user[4] != 1:
-        return "Yetkisiz"
-
-    with sqlite3.connect(DB) as con:
-        con.execute("UPDATE requests SET status='denied' WHERE id=?", (rid,))
-
-    return redirect("/admin")
-
-# ---------------- RUN ----------------
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
