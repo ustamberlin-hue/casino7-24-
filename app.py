@@ -2,23 +2,22 @@ import random, os
 from flask import Flask, render_template_string, redirect, request, session
 
 app = Flask(__name__)
-app.secret_key = "batak_final_master_2026"
+app.secret_key = "batak_final_v5_fix"
 
 # --- VERİ TABANI ---
 db = {"users": {"admin": {"ad": "Patron", "bakiye": 1000.0}}}
-BOTS = ["Mert", "Selin", "Caner"]
+BOTLAR = ["Mert", "Selin", "Caner"]
 
-# --- MOTOR (HAFIZA DOSTU) ---
-def get_clean_hand():
-    suits = [('spade','♠'), ('heart','♥'), ('diamond','♦'), ('club','♣')]
-    ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-    # Sadece 13 kartlık hafif veri üret
-    hand = []
+# --- OYUN MOTORU (HAFİFLETİLMİŞ) ---
+def kartlari_hazirla():
+    tipler = [('spade','♠'), ('heart','♥'), ('diamond','♦'), ('club','♣')]
+    rakamlar = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
+    el = []
     for _ in range(13):
-        s = random.choice(suits)
-        r = random.choice(ranks)
-        hand.append({'t': s[0], 's': s[1], 'v': r, 'p': ranks.index(r)})
-    return sorted(hand, key=lambda x: (x['t'], x['p']))
+        t = random.choice(tipler)
+        r = random.choice(rakamlar)
+        el.append({'t': t[0], 's': t[1], 'v': r, 'p': rakamlar.index(r)})
+    return sorted(el, key=lambda x: (x['t'], x['p']))
 
 HTML = """
 <!DOCTYPE html>
@@ -28,7 +27,7 @@ HTML = """
     <style>
         body { background:#073d1a; color:white; font-family:sans-serif; margin:0; overflow:hidden; }
         .header { background:#111; padding:10px; display:flex; justify-content:space-between; border-bottom:2px solid #fcd535; }
-        .table { position:relative; width:95vw; height:60vh; margin:20px auto; background:radial-gradient(#155d27, #0a3316); border:8px solid #5d3a1a; border-radius:150px; box-shadow: inset 0 0 50px #000; }
+        .table { position:relative; width:95vw; height:60vh; margin:15px auto; background:radial-gradient(#155d27, #0a3316); border:8px solid #5d3a1a; border-radius:150px; box-shadow: inset 0 0 50px #000; }
         .player { position:absolute; text-align:center; width:70px; font-size:10px; }
         .p-top { top:10px; left:50%; transform:translateX(-50%); }
         .p-left { left:10px; top:50%; transform:translateY(-50%); }
@@ -36,7 +35,7 @@ HTML = """
         .p-bottom { bottom:10px; left:50%; transform:translateX(-50%); }
         .avatar { background:#111; border:2px solid #fcd535; border-radius:50%; padding:8px; font-weight:bold; }
         .arena { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:160px; height:120px; }
-        .p-card { position:absolute; width:40px; height:60px; background:white; color:black; border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; font-size:12px; border:1px solid #000; }
+        .p-card { position:absolute; width:40px; height:60px; background:white; color:black; border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; border:1px solid #000; }
         .pos-bottom { bottom:0; left:50%; transform:translateX(-50%); }
         .pos-top { top:0; left:50%; transform:translateX(-50%); }
         .pos-left { left:0; top:50%; transform:translateY(-50%); }
@@ -51,20 +50,20 @@ HTML = """
 <body>
     {% if not session.user %}
         <div class="overlay">
-            <h2 style="color:#fcd535">💎 CASINO VIP</h2>
-            <form action="/login" method="post"><input type="text" name="u" placeholder="Adınız" required style="padding:10px;"><br><br><button class="btn">MASAYA GEÇ</button></form>
+            <h2 style="color:#fcd535">💎 VIP BATAK</h2>
+            <form action="/login" method="post"><input type="text" name="u" placeholder="Adınız" required style="padding:10px; border-radius:5px;"><br><br><button class="btn">OTUR</button></form>
         </div>
     {% elif not session.in_game %}
         <div class="overlay">
-            <h3>BAHİS: 20 €</h3>
-            <a href="/start" class="btn">BAŞLAT</a>
+            <h3 style="color:#fcd535">BAHİS: 20 €</h3>
+            <a href="/start" class="btn">OYUNA BAŞLA</a>
         </div>
     {% endif %}
 
     <div class="header">
         <span>👤 {{ session.user }}</span>
         <span style="color:#fcd535">💰 {{ bakiye }} €</span>
-        <a href="/logout" style="color:red; text-decoration:none;">ÇIKIŞ</a>
+        <a href="/logout" style="color:red; text-decoration:none;">ÇIK</a>
     </div>
 
     <div class="table">
@@ -93,7 +92,8 @@ HTML = """
 @app.route('/')
 def index():
     u = session.get("user")
-    b = db["users"][u]["bakiye"] if u in db["users"] else 0
+    if not u: return render_template_string(HTML)
+    b = db["users"].get(u, {"bakiye": 0})["bakiye"]
     return render_template_string(HTML, bakiye=b)
 
 @app.route('/login', methods=['POST'])
@@ -101,17 +101,18 @@ def login():
     u = request.form.get('u')
     session["user"] = u
     if u not in db["users"]: db["users"][u] = {"bakiye": 1000.0}
-    session["bots"] = BOTS
+    session["bots"] = BOTLAR
     session["in_game"] = False
+    session["arena"] = []
     return redirect('/')
 
 @app.route('/start')
 def start():
     u = session.get("user")
-    if db["users"][u]["bakiye"] < 20: return "Bakiye Yetersiz"
+    if db["users"][u]["bakiye"] < 20: return "Yetersiz Bakiye"
     db["users"][u]["bakiye"] -= 20
     session["in_game"] = True
-    session["hand"] = get_clean_hand()
+    session["hand"] = kartlari_hazirla()
     session["arena"] = []
     return redirect('/')
 
@@ -121,7 +122,6 @@ def play(idx):
     if hand and idx < len(hand):
         c = hand.pop(idx)
         session["hand"] = hand
-        # Botlar da kart atsın
         session["arena"] = [
             {'p': 'bottom', 't': c['t'], 's': c['s'], 'v': c['v']},
             {'p': 'top', 't': 'spade', 's': '♠', 'v': 'A'},
@@ -136,5 +136,5 @@ def logout():
     return redirect('/')
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    # RENDER İÇİN KRİTİK AYAR
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
