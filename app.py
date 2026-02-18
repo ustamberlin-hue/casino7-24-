@@ -1,37 +1,27 @@
-from flask import Flask, render_template, request
+import os
+from flask import Flask, render_template
 from flask_socketio import SocketIO, emit, join_room
-import eventlet
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'gizli-anahtar'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-users = {}
+waiting_users = []
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@socketio.on('join')
-def handle_join(data):
-    username = data.get('username', 'Bilinmeyen')
-    users[request.sid] = username
-    join_room('chat_room')
-    emit('user_list', list(users.values()), room='chat_room')
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    if request.sid in users:
-        del users[request.sid]
-        emit('user_list', list(users.values()), room='chat_room')
-
-@socketio.on('signal')
-def handle_signal(data):
-    # Sinyalin içine 'arayan kişi' bilgisini ekleyip öyle gönderiyoruz
-    if request.sid in users:
-        data['sender_name'] = users[request.sid]
-    data['sender_id'] = request.sid
-    emit('signal', data, broadcast=True, include_self=False)
+@socketio.on('find_match')
+def handle_find_match():
+    global waiting_users
+    if len(waiting_users) > 0:
+        partner_sid = waiting_users.pop(0)
+        room = f"room_{partner_sid}"
+        join_room(room)
+        emit('match_found', {'room': room, 'init': True})
+        emit('match_found', {'room': room, 'init': False}, room=partner_sid)
+    else:
+        waiting_users.append(request.sid)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
