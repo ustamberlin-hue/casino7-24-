@@ -5,59 +5,80 @@
     <title>Casino 7-24 Canlı Sohbet</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        video { width: 45%; border: 2px solid #333; margin: 5px; border-radius: 10px; }
-        #user-list { margin-bottom: 20px; font-weight: bold; }
+        body { font-family: Arial, sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        .video-container { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        video { width: 45%; max-width: 400px; border: 3px solid #ff4500; border-radius: 15px; background: black; }
+        .controls { margin-top: 20px; }
+        button { padding: 12px 25px; margin: 5px; font-size: 16px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; }
+        .btn-start { background: #28a745; color: white; }
+        .btn-stop { background: #dc3545; color: white; }
+        #chat-box { width: 80%; max-width: 600px; height: 150px; background: #333; margin: 20px auto; overflow-y: scroll; padding: 10px; border-radius: 10px; text-align: left; }
+        .status { color: #ffcc00; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h2>Canlı Görüntülü Sohbet</h2>
-    <div id="user-list">Aktif Kullanıcılar: <span id="users"></span></div>
+    <h2>🎰 Casino 7-24 Canlı Görüntülü Sohbet</h2>
     
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <div class="status">Aktif Kullanıcılar: <span id="users">Yükleniyor...</span></div>
+    
+    <div class="video-container">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <div class="controls">
+        <button class="btn-start" onclick="startSearch()">🔍 Yeni Biriyle Eşleş</button>
+        <button class="btn-stop" onclick="stopSearch()">🛑 Aramayı İptal Et / Kapat</button>
+    </div>
+
+    <div id="chat-box"><b>Sistem:</b> Hoş geldiniz! Birini bulmak için butona basın.</div>
 
     <script>
         const socket = io();
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        
-        // BAĞLANTI İÇİN KRİTİK REHBER (STUN SUNUCUSU)
-        const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-        let pc = new RTCPeerConnection(configuration);
+        let localStream;
+        let peerConnection;
+        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         // Kamerayı Aç
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-                localVideo.srcObject = stream;
-                stream.getTracks().forEach(track => pc.addTrack(track, stream));
-            });
+        async function initCamera() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+            } catch (e) {
+                alert("Kamera izni gerekli!");
+            }
+        }
 
-        pc.ontrack = event => { remoteVideo.srcObject = event.streams[0]; };
-
-        // Kullanıcı Listesi Güncelleme
+        // Kullanıcı Listesi
         socket.on('user_list', (users) => {
-            document.getElementById('users').innerText = users.join(", ");
+            document.getElementById('users').innerText = users.join(', ');
         });
 
-        // Arama Sinyali Geldiğinde
+        function startSearch() {
+            document.getElementById('chat-box').innerHTML += "<div><b>Sistem:</b> Yeni biri aranıyor...</div>";
+            socket.emit('find_match');
+        }
+
+        function stopSearch() {
+            location.reload(); // En temiz iptal yöntemi
+        }
+
+        // WebRTC Sinyalleşme Kodları (Bağlantı İçin)
         socket.on('signal', async (data) => {
+            if (!peerConnection) startConnection(false);
             if (data.type === 'offer') {
-                if (confirm(data.sender_name + " arıyor. Kabul ediyor musun?")) {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    socket.emit('signal', answer);
-                }
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('signal', answer);
             } else if (data.type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(data));
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
             } else if (data.candidate) {
-                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
 
-        // Sayfaya girince ismini sor ve odaya katıl
-        const myName = prompt("Kullanıcı adınızı girin:");
-        socket.emit('join', { username: myName });
+        initCamera();
     </script>
 </body>
 </html>
