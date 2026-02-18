@@ -11,26 +11,38 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: var(--bg); color: #fff; font-family: 'Orbitron', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Sayfa Düzeni - Butonlar için 85px boşluk bırakır */
-        .page { display: none; flex: 1; flex-direction: column; padding: 10px; height: calc(100vh - 85px); }
+        /* Sayfa Düzeni - Mesaj yazma alanı ve butonlar için altta 150px boşluk bırakır */
+        .page { display: none; flex: 1; flex-direction: column; padding: 10px; height: calc(100vh - 150px); }
         .page.active { display: flex; }
 
         /* Neon Panel */
-        .neon-container { flex: 1; border: 2px solid var(--pink); border-radius: 25px; box-shadow: 0 0 15px rgba(255,0,255,0.2); display: flex; flex-direction: column; background: rgba(0,0,0,0.8); overflow: hidden; margin-bottom: 5px; }
-        .header { padding: 15px; text-align: center; color: var(--pink); border-bottom: 1px solid #222; text-shadow: 0 0 5px var(--pink); font-size: 0.9rem; }
-        .chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .neon-container { flex: 1; border: 2px solid var(--pink); border-radius: 25px; box-shadow: 0 0 15px rgba(255,0,255,0.2); display: flex; flex-direction: column; background: rgba(0,0,0,0.8); overflow: hidden; }
+        .header { padding: 12px; text-align: center; color: var(--pink); border-bottom: 1px solid #222; text-shadow: 0 0 5px var(--pink); font-size: 0.85rem; }
+        .chat-box { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 
         /* Mesaj Balonları */
-        .msg { background: rgba(255,255,255,0.07); padding: 12px; border-radius: 15px; border-left: 3px solid var(--orange); font-size: 0.85rem; }
-        .msg b { color: var(--orange); margin-right: 5px; }
+        .msg { background: rgba(255,255,255,0.07); padding: 10px; border-radius: 12px; border-left: 3px solid var(--orange); font-size: 0.8rem; }
+        .msg b { color: var(--orange); }
 
-        /* Mesaj Yazma Alanı - Butonların hemen üstünde sabit */
-        .input-area { padding: 12px; display: flex; gap: 8px; background: #000; border-top: 1px solid #222; }
+        /* --- BURASI ÖNEMLİ: MESAJ YAZMA ALANI --- */
+        /* Butonların hemen üzerinde sabit kalması için 85px yukarıda konumlandı */
+        .fixed-input-container { 
+            position: fixed; 
+            bottom: 85px; 
+            left: 0; 
+            width: 100%; 
+            padding: 10px; 
+            background: #000; 
+            border-top: 1px solid #222; 
+            display: flex; 
+            gap: 8px; 
+            z-index: 1001; 
+        }
         input { flex: 1; background: transparent; border: 1px solid var(--blue); color: #fff; padding: 12px; border-radius: 20px; outline: none; font-family: 'Orbitron'; font-size: 0.8rem; }
-        .send-btn { background: var(--orange); border: none; padding: 0 20px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 0 10px var(--orange); }
+        .send-btn { background: var(--orange); border: none; padding: 0 20px; border-radius: 20px; font-weight: bold; cursor: pointer; color: #000; box-shadow: 0 0 10px var(--orange); }
 
-        /* Alt Navigasyon - Görseldeki Gibi Birebir Sabit */
-        nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 85px; background: #050507; display: flex; justify-content: space-around; align-items: center; padding: 0 10px 15px 10px; border-top: 1px solid #222; z-index: 1000; }
+        /* --- ALT NAVİGASYON --- */
+        nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 85px; background: #050507; display: flex; justify-content: space-around; align-items: center; padding: 0 10px 10px 10px; border-top: 1px solid #222; z-index: 1000; }
         nav button { width: 30%; height: 45px; border-radius: 18px; border: 2px solid; background: transparent; font-family: 'Orbitron'; font-weight: bold; font-size: 0.7rem; transition: 0.3s; }
         
         .btn-users { color: var(--pink); border-color: var(--pink); }
@@ -53,15 +65,15 @@
         <div class="neon-container">
             <div class="header">🌍 GENEL LOBİ</div>
             <div id="lobby-msgs" class="chat-box"></div>
-            <div class="input-area">
-                <input type="text" id="m-inp" placeholder="Mesaj yazın...">
-                <button class="send-btn" onclick="send()">GÖNDER</button>
-            </div>
+        </div>
+        <div class="fixed-input-container">
+            <input type="text" id="m-inp" placeholder="Mesaj yazın...">
+            <button class="send-btn" onclick="send()">GÖNDER</button>
         </div>
     </div>
 
     <div id="p-private" class="page">
-        <div class="neon-container" style="border-color: var(--blue);">
+        <div class="neon-container" style="border-color: var(--blue); box-shadow: 0 0 15px rgba(0,255,255,0.2);">
             <div class="header" style="color: var(--blue);">🔒 ÖZEL SOHBET</div>
             <div id="private-msgs" class="chat-box"></div>
         </div>
@@ -76,19 +88,22 @@
     <script>
         const socket = io();
         let target = "global";
-        let user = prompt("Sohbet için isminiz:");
+        let user = prompt("İsminiz:");
         if(user) socket.emit('register', user);
 
         function show(id, btn) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             
-            // Buton rengini aktif yapma
+            // Lobi dışında giriş kutusunu gizle
+            document.querySelector('.fixed-input-container').style.display = (id === 'p-lobby') ? 'flex' : 'none';
+
+            // Buton efektleri
             document.querySelectorAll('nav button').forEach(b => {
                 b.style.background = "transparent";
                 b.style.color = b.classList.contains('btn-users') ? "var(--pink)" : (b.classList.contains('btn-lobby') ? "#fff" : "var(--blue)");
             });
-            btn.style.background = id === 'p-lobby' ? "var(--pink)" : (id === 'p-users' ? "var(--pink)" : "var(--blue)");
+            btn.style.background = (id === 'p-private') ? "var(--blue)" : "var(--pink)";
             btn.style.color = "#000";
         }
 
@@ -103,9 +118,8 @@
 
         socket.on('receive_msg', data => {
             const area = data.target === 'global' ? 'lobby-msgs' : 'private-msgs';
-            const cont = document.getElementById(area);
-            cont.innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.msg}</div>`;
-            cont.scrollTop = cont.scrollHeight;
+            document.getElementById(area).innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.msg}</div>`;
+            document.getElementById(area).scrollTop = 999999;
         });
 
         socket.on('update_users', list => {
@@ -118,7 +132,7 @@
 
         function setT(n) {
             target = n;
-            alert(n + " ile özel odaya geçildi!");
+            alert(n + " ile özel sohbet seçildi.");
             show('p-lobby', document.querySelector('.btn-lobby'));
         }
     </script>
