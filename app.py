@@ -1,16 +1,17 @@
-import os, sqlite3
+import os, sqlite3, time
 from flask import Flask, request, redirect, session, render_template_string, jsonify
 
 app = Flask(__name__)
-app.secret_key = "istekli_sohbet_2026"
-DB = "istek_sohbet.db"
+app.secret_key = "sohbet_pro_v3_2026"
+DB = "sohbet_v3.db"
 
 # ---------------- 1. VERİ TABANI ----------------
 def init_db():
     with sqlite3.connect(DB) as con:
         cur = con.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE)")
-        cur.execute("CREATE TABLE IF NOT EXISTS online_peers (peer_id TEXT PRIMARY KEY, username TEXT)")
+        # last_seen ekleyerek aktif olmayanları temizleyeceğiz
+        cur.execute("CREATE TABLE IF NOT EXISTS online_peers (peer_id TEXT PRIMARY KEY, username TEXT, last_seen REAL)")
 init_db()
 
 # ---------------- 2. GÖRSEL VE SİSTEM TASARIMI (HTML/JS) ----------------
@@ -19,44 +20,45 @@ UI_HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Görüntülü İstek Paneli</title>
+    <title>Görüntülü Arama Sistemi</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #0f1216; color: white; font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
-        .sidebar { width: 280px; background: #1a1e23; border-right: 1px solid #333; padding: 20px; }
+        body { background: #0f1216; color: white; font-family: sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 300px; background: #1a1e23; border-right: 1px solid #333; padding: 20px; overflow-y: auto; }
         .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .video-area { display: flex; gap: 15px; width: 100%; justify-content: center; margin-top: 20px; }
         video { width: 45%; max-width: 450px; background: #000; border-radius: 15px; border: 2px solid #444; transform: scaleX(-1); }
         .user-card { background: #2c323a; padding: 12px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
         button { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
         .call-btn { background: #2ecc71; color: white; }
-        .call-btn:disabled { background: #555; cursor: not-allowed; }
-        #modal { display: none; position: fixed; top: 20%; left: 50%; transform: translate(-50%, -50%); background: #fff; color: #000; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 100; }
-        .status { margin: 10px; color: #f1c40f; }
+        .cancel-btn { background: #e74c3c !important; color: white; }
+        #modal { display: none; position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); background: #fff; color: #000; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.7); z-index: 1000; }
+        .status { margin: 10px; color: #f1c40f; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="modal">
-        <h3 id="callerName">Biri arıyor...</h3>
-        <button onclick="acceptCall()" style="background:green; color:white;">Kabul Et</button>
-        <button onclick="rejectCall()" style="background:red; color:white;">Reddet</button>
+        <h3 id="callerName">Arama Geliyor...</h3>
+        <button onclick="acceptCall()" style="background:green; color:white; padding:15px;">Kabul Et</button>
+        <button onclick="rejectCall()" style="background:red; color:white; padding:15px;">Reddet</button>
     </div>
 
     <div class="sidebar">
-        <h3>👥 Kişiler</h3>
+        <h3>🟢 Aktif Kişiler</h3>
         <div id="userList">Yükleniyor...</div>
     </div>
 
     <div class="main">
-        <h2>Hoşgeldin, {{ session['username'] }}</h2>
-        <div id="status" class="status">Kamera hazırlanıyor...</div>
+        <h2>Kullanıcı: {{ session['username'] }}</h2>
+        <div id="status" class="status">Sistem Hazırlanıyor...</div>
         <div class="video-area">
             <video id="localVideo" autoplay playsinline muted></video>
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
         <div style="margin-top:20px;">
-            <button onclick="toggleMic()" id="micBtn" style="background:#555; color:white;">🎤 Sesi Kapat</button>
-            <a href="/logout"><button style="background:none; color:gray;">Çıkış</button></a>
+            <button onclick="toggleMic()" id="micBtn" style="background:#474d57; color:white;">🎤 Sesi Kapat</button>
+            <button onclick="endCurrentCall()" style="background:#e74c3c; color:white;">📞 Aramayı Kapat</button>
+            <a href="/logout"><button style="background:none; color:gray; margin-left:20px;">Çıkış Yap</button></a>
         </div>
     </div>
 
@@ -65,10 +67,18 @@ UI_HTML = """
         const remoteVideo = document.getElementById('remoteVideo');
         const statusDiv = document.getElementById('status');
         const modal = document.getElementById('modal');
-        let myStream, peer, incomingCall, myPeerId;
+        let myStream, peer, incomingCall, outgoingCall, myPeerId;
         let isCalling = false;
 
-        const config = { config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }, { url: 'stun:global.stun.twilio.com:3478' }] } };
+        const config = { 
+            config: { 
+                'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' }, 
+                    { url: 'stun:global.stun.twilio.com:3478' }
+                ],
+                'iceCandidatePoolSize': 10
+            } 
+        };
 
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             myStream = stream;
@@ -77,18 +87,23 @@ UI_HTML = """
 
             peer.on('open', id => {
                 myPeerId = id;
-                statusDiv.innerText = "Online";
-                fetch(`/register_peer?id=${id}`);
+                statusDiv.innerText = "Sohbete Hazır";
+                heartbeat(id);
                 updateList();
             });
 
             peer.on('call', call => {
-                if(isCalling) return call.close(); // Zaten meşgulsen reddet
+                if(isCalling) { call.answer(); call.close(); return; }
                 incomingCall = call;
-                document.getElementById('callerName').innerText = "Gelen Arama...";
                 modal.style.display = 'block';
             });
         });
+
+        // Online kalmak için sunucuya her 5 saniyede bir sinyal gönderir
+        function heartbeat(id) {
+            fetch(`/register_peer?id=${id}`);
+            setTimeout(() => heartbeat(id), 5000);
+        }
 
         async function updateList() {
             const res = await fetch('/get_online_users');
@@ -97,29 +112,39 @@ UI_HTML = """
             listDiv.innerHTML = "";
             users.forEach(u => {
                 if (u.peer_id !== myPeerId) {
-                    listDiv.innerHTML += `<div class="user-card">
-                        <span>${u.username}</span>
-                        <button class="call-btn" id="btn-${u.peer_id}" onclick="startRequest('${u.peer_id}')">İstek Gönder</button>
-                    </div>`;
+                    listDiv.innerHTML += `
+                        <div class="user-card">
+                            <span>${u.username}</span>
+                            <button class="${isCalling ? 'cancel-btn' : 'call-btn'}" 
+                                    id="btn-${u.peer_id}" 
+                                    onclick="${isCalling ? 'cancelCall()' : `sendRequest('${u.peer_id}')`}">
+                                ${isCalling ? 'İptal Et' : 'İstek Gönder'}
+                            </button>
+                        </div>`;
                 }
             });
         }
 
-        function startRequest(pId) {
-            if(isCalling) return;
+        function sendRequest(pId) {
             isCalling = true;
-            document.getElementById(`btn-${pId}`).disabled = true;
-            document.getElementById(`btn-${pId}`).innerText = "Bekleniyor...";
-            
             statusDiv.innerText = "Arama İsteği Gönderildi...";
-            const call = peer.call(pId, myStream);
+            updateList();
             
-            call.on('stream', rStream => {
+            outgoingCall = peer.call(pId, myStream);
+            outgoingCall.on('stream', rStream => {
                 remoteVideo.srcObject = rStream;
                 statusDiv.innerText = "Bağlandı!";
             });
-            
-            call.on('close', () => { resetCall(pId); });
+            outgoingCall.on('close', () => { cancelCall(); });
+        }
+
+        function cancelCall() {
+            if(outgoingCall) outgoingCall.close();
+            if(incomingCall) incomingCall.close();
+            remoteVideo.srcObject = null;
+            isCalling = false;
+            statusDiv.innerText = "Arama İptal Edildi.";
+            updateList();
         }
 
         function acceptCall() {
@@ -129,6 +154,7 @@ UI_HTML = """
             incomingCall.on('stream', rStream => {
                 remoteVideo.srcObject = rStream;
                 statusDiv.innerText = "Bağlandı!";
+                updateList();
             });
         }
 
@@ -138,12 +164,7 @@ UI_HTML = """
             isCalling = false;
         }
 
-        function resetCall(pId) {
-            isCalling = false;
-            statusDiv.innerText = "Arama Sonlandı.";
-            const btn = document.getElementById(`btn-${pId}`);
-            if(btn) { btn.disabled = false; btn.innerText = "İstek Gönder"; }
-        }
+        function endCurrentCall() { cancelCall(); }
 
         function toggleMic() {
             const enabled = myStream.getAudioTracks()[0].enabled;
@@ -151,7 +172,7 @@ UI_HTML = """
             document.getElementById('micBtn').innerText = !enabled ? "🎤 Sesi Kapat" : "🎤 Sesi Aç";
         }
 
-        setInterval(updateList, 8000);
+        setInterval(updateList, 6000);
     </script>
 </body>
 </html>
@@ -168,12 +189,17 @@ def register_peer():
     pid = request.args.get('id')
     if pid and "username" in session:
         with sqlite3.connect(DB) as con:
-            con.execute("INSERT OR REPLACE INTO online_peers (peer_id, username) VALUES (?,?)", (pid, session["username"]))
+            # last_seen süresini günceller
+            con.execute("INSERT OR REPLACE INTO online_peers (peer_id, username, last_seen) VALUES (?,?,?)", 
+                        (pid, session["username"], time.time()))
     return "ok"
 
 @app.route('/get_online_users')
 def get_online_users():
+    now = time.time()
     with sqlite3.connect(DB) as con:
+        # 10 saniye boyunca sinyal vermeyeni listeden siler
+        con.execute("DELETE FROM online_peers WHERE last_seen < ?", (now - 10,))
         cur = con.cursor()
         cur.execute("SELECT peer_id, username FROM online_peers")
         rows = cur.fetchall()
@@ -191,10 +217,13 @@ def login():
             session["user_id"] = user[0]
             session["username"] = u
             return redirect('/')
-    return '<body style="background:#0f1216;color:white;text-align:center;padding-top:100px;"><form method="post"><h2>Görüntülü Sohbet Giriş</h2><input name="u" placeholder="Adınız" required style="padding:10px;"><br><br><button style="padding:10px 20px;">Sisteme Gir</button></form></body>'
+    return '<body style="background:#0f1216;color:white;text-align:center;padding-top:100px;"><form method="post"><h2>Sohbet Paneli Giriş</h2><input name="u" placeholder="Adınız" required style="padding:10px;"><br><br><button style="padding:10px 20px;">Giriş Yap</button></form></body>'
 
 @app.route('/logout')
 def logout():
+    if "username" in session:
+        with sqlite3.connect(DB) as con:
+            con.execute("DELETE FROM online_peers WHERE username=?", (session["username"],))
     session.clear()
     return redirect('/login')
 
