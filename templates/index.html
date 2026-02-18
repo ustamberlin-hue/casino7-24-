@@ -3,138 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Casino 7-24 VIP</title>
+    <title>Casino 7-24 | VIP Lobi</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --pink: #ff00ff; --blue: #00ffff; --orange: #ff9100; --bg: #0d0d12; }
+        :root { --pink: #ff00ff; --blue: #00ffff; --yellow: #ffea00; --red: #ff0000; --bg: #0d0d12; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: var(--bg); color: #fff; font-family: 'Orbitron', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        body { background: var(--bg); color: #fff; font-family: 'Orbitron', sans-serif; height: 100vh; display: flex; overflow: hidden; }
 
-        /* Sayfa Düzeni - Mesaj yazma alanı ve butonlar için altta 150px boşluk bırakır */
-        .page { display: none; flex: 1; flex-direction: column; padding: 10px; height: calc(100vh - 150px); }
-        .page.active { display: flex; }
+        /* --- SOL SABİT PANEL (DARALTILMIŞ) --- */
+        #sidebar { 
+            width: 25%; 
+            height: 100vh; 
+            border-right: 2px solid var(--pink); 
+            background: rgba(0,0,0,0.95); 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 5px 0 15px rgba(255,0,255,0.2);
+            z-index: 10;
+        }
+        .side-title { font-size: 0.65rem; color: var(--pink); text-align: center; padding: 15px 5px; border-bottom: 1px solid #222; letter-spacing: 1px; }
+        #u-list { flex: 1; overflow-y: auto; padding: 5px; }
+        .u-item { padding: 8px 5px; font-size: 0.6rem; border-bottom: 1px solid #111; color: var(--blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* Neon Panel */
-        .neon-container { flex: 1; border: 2px solid var(--pink); border-radius: 25px; box-shadow: 0 0 15px rgba(255,0,255,0.2); display: flex; flex-direction: column; background: rgba(0,0,0,0.8); overflow: hidden; }
-        .header { padding: 12px; text-align: center; color: var(--pink); border-bottom: 1px solid #222; text-shadow: 0 0 5px var(--pink); font-size: 0.85rem; }
-        .chat-box { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        /* --- SAĞ ANA ALAN --- */
+        #main-content { flex: 1; display: flex; flex-direction: column; position: relative; background: radial-gradient(circle at center, #1a1a2e 0%, #0d0d12 100%); }
+        
+        /* Mesaj Penceresi */
+        .chat-area { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 140px; }
+        .msg { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; font-size: 0.75rem; border-left: 3px solid var(--blue); box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .msg b { color: var(--blue); }
 
-        /* Mesaj Balonları */
-        .msg { background: rgba(255,255,255,0.07); padding: 10px; border-radius: 12px; border-left: 3px solid var(--orange); font-size: 0.8rem; }
-        .msg b { color: var(--orange); }
-
-        /* --- BURASI ÖNEMLİ: MESAJ YAZMA ALANI --- */
-        /* Butonların hemen üzerinde sabit kalması için 85px yukarıda konumlandı */
-        .fixed-input-container { 
+        /* --- ALT KONTROL PANELİ (SABİT) --- */
+        .bottom-controls { 
             position: fixed; 
-            bottom: 85px; 
-            left: 0; 
-            width: 100%; 
-            padding: 10px; 
-            background: #000; 
+            bottom: 0; 
+            right: 0; 
+            width: 75%; 
+            background: rgba(5, 5, 7, 0.95); 
+            padding: 15px; 
             border-top: 1px solid #222; 
             display: flex; 
-            gap: 8px; 
-            z-index: 1001; 
+            flex-direction: column; 
+            gap: 12px;
+            z-index: 100;
         }
-        input { flex: 1; background: transparent; border: 1px solid var(--blue); color: #fff; padding: 12px; border-radius: 20px; outline: none; font-family: 'Orbitron'; font-size: 0.8rem; }
-        .send-btn { background: var(--orange); border: none; padding: 0 20px; border-radius: 20px; font-weight: bold; cursor: pointer; color: #000; box-shadow: 0 0 10px var(--orange); }
 
-        /* --- ALT NAVİGASYON --- */
-        nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 85px; background: #050507; display: flex; justify-content: space-around; align-items: center; padding: 0 10px 10px 10px; border-top: 1px solid #222; z-index: 1000; }
-        nav button { width: 30%; height: 45px; border-radius: 18px; border: 2px solid; background: transparent; font-family: 'Orbitron'; font-weight: bold; font-size: 0.7rem; transition: 0.3s; }
+        /* Mesaj Yazma Kutusu */
+        .input-box { 
+            width: 100%; 
+            background: transparent; 
+            border: 2px solid var(--blue); 
+            border-radius: 20px; 
+            padding: 12px 20px; 
+            color: #fff; 
+            font-family: 'Orbitron'; 
+            font-size: 0.8rem; 
+            outline: none;
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+
+        /* Renkli Butonlar Grubu */
+        .btn-group { display: flex; justify-content: space-between; gap: 8px; }
+        .nav-btn { 
+            flex: 1; 
+            padding: 10px 5px; 
+            border-radius: 12px; 
+            border: none; 
+            font-family: 'Orbitron'; 
+            font-weight: bold; 
+            font-size: 0.55rem; 
+            cursor: pointer; 
+            transition: 0.3s;
+            text-align: center;
+        }
         
-        .btn-users { color: var(--pink); border-color: var(--pink); }
-        .btn-lobby { color: #fff; border-color: var(--pink); background: var(--pink); box-shadow: 0 0 15px var(--pink); }
-        .btn-private { color: var(--blue); border-color: var(--blue); }
+        .btn-ayarlar { background: var(--yellow); color: #000; box-shadow: 0 0 8px var(--yellow); }
+        .btn-ozel { background: var(--red); color: #fff; box-shadow: 0 0 8px var(--red); }
+        .btn-lobi { background: #0084ff; color: #fff; box-shadow: 0 0 8px #0084ff; }
+        .btn-arkadas { background: #333; color: #fff; border: 1px solid #444; }
 
-        .u-item { padding: 15px; border-bottom: 1px solid #222; color: var(--blue); font-size: 0.9rem; }
+        /* Sayfa Geçişleri İçin */
+        .page { display: none; height: 100%; flex-direction: column; }
+        .page.active { display: flex; }
     </style>
 </head>
 <body>
 
-    <div id="p-users" class="page">
-        <div class="neon-container">
-            <div class="header">👤 AKTİF ÜYELER</div>
-            <div id="u-list" class="chat-box"></div>
-        </div>
+    <div id="sidebar">
+        <div class="side-title">ÜYELER</div>
+        <div id="u-list">
+            </div>
     </div>
 
-    <div id="p-lobby" class="page active">
-        <div class="neon-container">
-            <div class="header">🌍 GENEL LOBİ</div>
-            <div id="lobby-msgs" class="chat-box"></div>
+    <div id="main-content">
+        
+        <div id="p-lobby" class="page active">
+            <div id="lobby-msgs" class="chat-area"></div>
         </div>
-        <div class="fixed-input-container">
-            <input type="text" id="m-inp" placeholder="Mesaj yazın...">
-            <button class="send-btn" onclick="send()">GÖNDER</button>
-        </div>
-    </div>
 
-    <div id="p-private" class="page">
-        <div class="neon-container" style="border-color: var(--blue); box-shadow: 0 0 15px rgba(0,255,255,0.2);">
-            <div class="header" style="color: var(--blue);">🔒 ÖZEL SOHBET</div>
-            <div id="private-msgs" class="chat-box"></div>
+        <div id="p-settings" class="page" style="padding: 20px;">
+            <h3 style="color:var(--yellow); margin-bottom:15px; font-size:0.9rem;">AYARLAR & CV</h3>
+            <input type="password" placeholder="Yeni Şifre" style="width:100%; background:#000; border:1px solid var(--blue); padding:10px; border-radius:10px; color:#fff; margin-bottom:10px; font-family:'Orbitron';">
+            <textarea placeholder="CV / Adminlik Başvurusu..." rows="5" style="width:100%; background:#000; border:1px solid var(--blue); padding:10px; border-radius:10px; color:#fff; font-family:'Orbitron';"></textarea>
+            <button style="margin-top:10px; padding:10px; background:var(--yellow); border:none; border-radius:10px; font-weight:bold; width:100%;">BAŞVURUYU GÖNDER</button>
         </div>
-    </div>
 
-    <nav>
-        <button class="btn-users" onclick="show('p-users', this)">ÜYELER</button>
-        <button class="btn-lobby" onclick="show('p-lobby', this)">LOBİ</button>
-        <button class="btn-private" onclick="show('p-private', this)">ÖZEL</button>
-    </nav>
+        <div class="bottom-controls">
+            <input type="text" id="m-inp" class="input-box" placeholder="Mesaj yazın...">
+            
+            <div class="btn-group">
+                <button class="nav-btn btn-ayarlar" onclick="show('p-settings')">AYARLAR</button>
+                <button class="nav-btn btn-ozel" onclick="alert('Özel Oda Yakında!')">ÖZEL ODA</button>
+                <button class="nav-btn btn-lobi" onclick="show('p-lobby')">LOBİ</button>
+                <button class="nav-btn btn-arkadas" onclick="alert('Arkadaş Listesi Yakında!')">ARKADAŞLAR</button>
+            </div>
+        </div>
+
+    </div>
 
     <script>
         const socket = io();
-        let target = "global";
-        let user = prompt("İsminiz:");
+        let user = prompt("Sohbete katılmak için isminiz:");
         if(user) socket.emit('register', user);
 
-        function show(id, btn) {
+        function show(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            
-            // Lobi dışında giriş kutusunu gizle
-            document.querySelector('.fixed-input-container').style.display = (id === 'p-lobby') ? 'flex' : 'none';
-
-            // Buton efektleri
-            document.querySelectorAll('nav button').forEach(b => {
-                b.style.background = "transparent";
-                b.style.color = b.classList.contains('btn-users') ? "var(--pink)" : (b.classList.contains('btn-lobby') ? "#fff" : "var(--blue)");
-            });
-            btn.style.background = (id === 'p-private') ? "var(--blue)" : "var(--pink)";
-            btn.style.color = "#000";
+            // Ayarlar sayfasında mesaj kutusunu gizlemek istersen burayı düzenleyebilirsin
         }
 
-        document.getElementById('m-inp').addEventListener('keypress', e => { if(e.key === 'Enter') send(); });
+        // Mesaj Gönderme
+        document.getElementById('m-inp').addEventListener('keypress', e => {
+            if(e.key === 'Enter') send();
+        });
 
         function send() {
             const inp = document.getElementById('m-inp');
             if(!inp.value.trim()) return;
-            socket.emit('send_msg', {target: target, msg: inp.value});
+            socket.emit('send_msg', {target: 'global', msg: inp.value});
             inp.value = "";
         }
 
+        // Mesaj Alma
         socket.on('receive_msg', data => {
-            const area = data.target === 'global' ? 'lobby-msgs' : 'private-msgs';
-            document.getElementById(area).innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.msg}</div>`;
-            document.getElementById(area).scrollTop = 999999;
+            const area = document.getElementById('lobby-msgs');
+            area.innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.msg}</div>`;
+            area.scrollTop = area.scrollHeight;
         });
 
+        // Üye Listesi Güncelleme
         socket.on('update_users', list => {
             const div = document.getElementById('u-list');
             div.innerHTML = "";
             list.forEach(u => {
-                if(u.name !== user) div.innerHTML += `<div class="u-item" onclick="setT('${u.name}')">👤 ${u.name}</div>`;
+                div.innerHTML += `<div class="u-item">● ${u.name}</div>`;
             });
         });
-
-        function setT(n) {
-            target = n;
-            alert(n + " ile özel sohbet seçildi.");
-            show('p-lobby', document.querySelector('.btn-lobby'));
-        }
     </script>
 </body>
 </html>
