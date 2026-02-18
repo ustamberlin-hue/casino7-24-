@@ -2,90 +2,127 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Casino 7-24 Özel Sohbet</title>
+    <title>Casino 7-24 VIP</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; height: 100vh; margin: 0; }
-        #side-panel { width: 250px; background: #1e1e1e; border-right: 2px solid #ff4500; padding: 20px; }
-        #main-content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .user-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #333; transition: 0.3s; }
-        .user-item:hover { background: #ff4500; color: black; }
-        #chat-window { width: 90%; max-width: 600px; height: 300px; background: #222; border-radius: 10px; overflow-y: auto; padding: 15px; margin-top: 20px; }
-        input { width: 70%; padding: 10px; border-radius: 5px; border: none; }
-        button { padding: 10px 20px; background: #ff4500; border: none; color: white; cursor: pointer; border-radius: 5px; }
-        .video-box { width: 300px; height: 200px; background: black; border: 2px solid #ff4500; border-radius: 10px; margin: 10px; }
+        body { font-family: sans-serif; background: #0f0f0f; color: white; display: flex; height: 100vh; margin: 0; }
+        #side-panel { width: 200px; background: #1a1a1a; border-right: 2px solid #ff4500; padding: 15px; }
+        #main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        .v-box { width: 45%; height: 250px; background: #000; border: 2px solid #ff4500; border-radius: 10px; }
+        #chat-area { width: 90%; height: 200px; background: #1e1e1e; overflow-y: auto; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px solid #333; }
+        .user-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #222; font-size: 14px; }
+        .user-item:hover { color: #ff4500; }
+        .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+        button { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-call { background: #28a745; color: white; }
+        .btn-cancel { background: #dc3545; color: white; }
+        input { padding: 10px; width: 60%; border-radius: 5px; border: none; }
     </style>
 </head>
 <body>
     <div id="side-panel">
-        <h3>👥 Aktif Üyeler</h3>
-        <div id="user-list">Bekleniyor...</div>
+        <h3>👥 Üyeler</h3>
+        <div id="user-list">Bağlanıyor...</div>
     </div>
 
-    <div id="main-content">
-        <h2>🎰 Casino 7-24 Özel Görüntülü Sohbet</h2>
-        <div style="display: flex;">
-            <video class="video-box" id="localVideo" autoplay playsinline muted></video>
-            <video class="video-box" id="remoteVideo" autoplay playsinline></video>
+    <div id="main">
+        <h3 id="target-title">🎰 Genel Sohbet</h3>
+        <div style="display: flex; width: 100%; justify-content: center; gap: 10px;">
+            <video class="v-box" id="localVideo" autoplay playsinline muted></video>
+            <video class="v-box" id="remoteVideo" autoplay playsinline></video>
         </div>
 
-        <div id="chat-window"><b>Sistem:</b> Sohbet etmek için soldan bir isme tıkla.</div>
-        <div style="margin-top: 10px;">
-            <input type="text" id="msg-input" placeholder="Mesajınızı yazın...">
-            <button onclick="sendMsg()">Gönder</button>
+        <div class="controls" id="call-buttons" style="display:none;">
+            <button class="btn-call" onclick="callUser()">📞 Arama İsteği Gönder</button>
+            <button class="btn-cancel" onclick="cancelCall()">✖ İptal Et</button>
+        </div>
+
+        <div id="chat-area"></div>
+        
+        <div style="width: 100%; text-align: center;">
+            <input type="text" id="msg-input" placeholder="Mesaj yazın (Enter)...">
+            <button onclick="send()" style="background:#ff4500; color:white;">Gönder</button>
         </div>
     </div>
 
     <script>
-    const socket = io();
-    let selectedUser = "";
-    let myName = prompt("Lütfen kullanıcı adınızı girin:");
+        const socket = io();
+        let myName = prompt("İsminiz:");
+        let selectedUser = ""; // Boşsa genel sohbet
 
-    if(myName) {
-        socket.emit('register', myName);
-    }
+        if(myName) socket.emit('register', myName);
 
-    // ENTER TUŞU ÖZELLİĞİ
-    document.getElementById('msg-input').addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            sendMsg();
-        }
-    });
+        // Kamera Başlat
+        navigator.mediaDevices.getUserMedia({video: true, audio: true})
+            .then(s => { document.getElementById('localVideo').srcObject = s; });
 
-    function sendMsg() {
-        const input = document.getElementById('msg-input');
-        const msg = input.value;
-        if(selectedUser && msg) {
-            socket.emit('send_private_msg', {target: selectedUser, message: msg});
+        function send() {
+            const input = document.getElementById('msg-input');
+            const msg = input.value;
+            if(!msg) return;
+
+            if(selectedUser) {
+                socket.emit('send_private_event', {target: selectedUser, message: msg, type: 'private'});
+            } else {
+                socket.emit('send_global_msg', {message: msg});
+            }
             input.value = "";
-        } else if(!selectedUser) {
-            alert("Önce soldan mesaj atacağınız kişiyi seçin!");
         }
-    }
 
-    socket.on('update_user_list', (userNames) => {
-        const list = document.getElementById('user-list');
-        list.innerHTML = "";
-        userNames.forEach(name => {
-            if(name !== myName) { // Kendini listede görme
-                const div = document.createElement('div');
-                div.className = "user-item";
-                div.innerText = name;
-                div.onclick = () => { 
-                    selectedUser = name; 
-                    document.getElementById('chat-window').innerHTML += `<div><b>Sistem:</b> ${name} ile sohbete başlandı.</div>`;
-                };
-                list.appendChild(div);
+        document.getElementById('msg-input').onkeypress = e => { if(e.key==='Enter') send(); };
+
+        function callUser() {
+            socket.emit('send_private_event', {target: selectedUser, type: 'call_req'});
+            addMsg("Sistem", `Siz ${selectedUser} kişisine arama isteği gönderdiniz.`, "yellow");
+        }
+
+        function cancelCall() {
+            socket.emit('send_private_event', {target: selectedUser, type: 'call_cancel'});
+            addMsg("Sistem", "Arama iptal edildi.", "red");
+        }
+
+        socket.on('update_user_list', list => {
+            const div = document.getElementById('user-list');
+            div.innerHTML = "<div class='user-item' onclick='selectGenel()'>🌍 Genel Sohbet</div>";
+            list.forEach(u => {
+                if(u !== myName) {
+                    const item = document.createElement('div');
+                    item.className = "user-item";
+                    item.innerText = u;
+                    item.onclick = () => { 
+                        selectedUser = u; 
+                        document.getElementById('target-title').innerText = "👤 Özel: " + u;
+                        document.getElementById('call-buttons').style.display = "flex";
+                    };
+                    div.appendChild(item);
+                }
+            });
+        });
+
+        function selectGenel() {
+            selectedUser = "";
+            document.getElementById('target-title').innerText = "🎰 Genel Sohbet";
+            document.getElementById('call-buttons').style.display = "none";
+        }
+
+        socket.on('receive_msg', data => {
+            let color = data.type === 'global' ? 'white' : '#ff4500';
+            if(data.type === 'call_req') {
+                if(confirm(data.sender + " sizinle görüntülü konuşmak istiyor. Kabul mü?")) {
+                    alert("Arama kabul edildi (WebRTC bağlantısı başlıyor...)");
+                }
+            } else if(data.type === 'call_cancel') {
+                alert(data.sender + " aramayı iptal etti.");
+            } else {
+                addMsg(data.sender, data.message, color);
             }
         });
-    });
 
-    socket.on('receive_private_msg', (data) => {
-        const chat = document.getElementById('chat-window');
-        chat.innerHTML += `<div><b style="color:#ff4500">${data.sender}:</b> ${data.message}</div>`;
-        chat.scrollTop = chat.scrollHeight;
-    });
-</script>
-
+        function addMsg(s, m, c) {
+            const area = document.getElementById('chat-area');
+            area.innerHTML += `<div style="color:${c}"><b>${s}:</b> ${m}</div>`;
+            area.scrollTop = area.scrollHeight;
+        }
+    </script>
 </body>
 </html>
