@@ -5,17 +5,16 @@ from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Aktif kullanıcıları sakla {sid: username}
+# {sid: username}
 users = {}
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@socketio.on('connect')
-def handle_connect():
-    # Geçici bir isim ata
-    users[request.sid] = f"User_{request.sid[:4]}"
+@socketio.on('register')
+def handle_register(username):
+    users[request.sid] = username
     emit('update_user_list', list(users.values()), broadcast=True)
 
 @socketio.on('disconnect')
@@ -26,7 +25,6 @@ def handle_disconnect():
 
 @socketio.on('send_private_msg')
 def handle_private_msg(data):
-    # data: {'target': 'kullanici_adi', 'message': 'merhaba'}
     target_sid = next((sid for sid, name in users.items() if name == data['target']), None)
     if target_sid:
         emit('receive_private_msg', {'sender': users[request.sid], 'message': data['message']}, room=target_sid)
