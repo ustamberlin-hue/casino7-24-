@@ -1,14 +1,15 @@
 import os, sqlite3, time
 from flask import Flask, request, redirect, session, render_template_string, jsonify
+from flask_socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
-app.secret_key = "sohbet_chat_v7"
-DB = "sohbet_v7.db"
+app.secret_key = "kesin_cozum_v8"
+socketio = SocketIO(app, cors_allowed_origins="*")
+DB = "sohbet_v8.db"
 
 def init_db():
     with sqlite3.connect(DB) as con:
-        cur = con.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS online_peers (peer_id TEXT PRIMARY KEY, username TEXT, last_seen REAL)")
+        con.execute("CREATE TABLE IF NOT EXISTS online_peers (peer_id TEXT PRIMARY KEY, username TEXT, last_seen REAL)")
 init_db()
 
 UI_HTML = """
@@ -16,254 +17,169 @@ UI_HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Görüntülü Sohbet & Mesaj v7</title>
+    <title>Görüntülü Sohbet v8</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         body { background: #0f1216; color: white; font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
-        .sidebar { width: 280px; background: #1a1e23; border-right: 1px solid #333; padding: 20px; display: flex; flex-direction: column; }
-        .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
-        .video-area { display: flex; gap: 15px; width: 100%; justify-content: center; margin-top: 10px; }
-        video { width: 45%; max-width: 400px; background: #000; border-radius: 12px; border: 2px solid #444; transform: scaleX(-1); }
-        
-        /* Sohbet Alanı */
-        #chatBox { width: 90%; max-width: 800px; height: 200px; background: #1a1e23; border: 1px solid #444; margin-top: 20px; border-radius: 10px; display: flex; flex-direction: column; }
-        #messages { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; }
-        .msg { margin-bottom: 5px; padding: 5px 10px; border-radius: 5px; background: #2c323a; }
-        #chatInputArea { display: flex; border-top: 1px solid #444; }
-        #chatInput { flex: 1; background: none; border: none; color: white; padding: 10px; outline: none; }
-        
-        .user-card { background: #2c323a; padding: 10px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        button { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
-        .call-btn { background: #2ecc71; color: white; }
-        .cancel-btn { background: #e74c3c !important; color: white; }
-        #modal { display: none; position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); background: #fff; color: #000; padding: 30px; border-radius: 10px; text-align: center; z-index: 2000; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+        .sidebar { width: 260px; background: #1a1e23; border-right: 1px solid #333; padding: 20px; }
+        .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 15px; }
+        video { width: 45%; max-width: 400px; background: #000; border-radius: 10px; transform: scaleX(-1); border: 1px solid #444; }
+        #chat { width: 90%; height: 150px; background: #1a1e23; border: 1px solid #444; margin-top: 15px; overflow-y: auto; padding: 10px; border-radius: 5px; }
+        .msg { margin-bottom: 5px; padding: 3px 8px; background: #2c323a; border-radius: 4px; font-size: 13px; }
+        input { width: 70%; padding: 8px; border-radius: 5px; border: none; margin-top: 5px; }
+        .user-card { background: #2c323a; padding: 8px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; }
+        #modal { display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 20px; border-radius: 10px; z-index: 99; }
     </style>
 </head>
 <body>
     <div id="modal">
-        <h3 id="callerName">Arama Geliyor...</h3>
-        <button onclick="acceptCall()" style="background:green; color:white; padding:10px 20px;">KABUL ET</button>
-        <button onclick="rejectCall()" style="background:red; color:white; padding:10px 20px; margin-left:10px;">REDDET</button>
+        <h4 id="callerTitle">Arama Geliyor...</h4>
+        <button onclick="acceptCall()" style="background:green; color:white;">Kabul Et</button>
+        <button onclick="rejectCall()" style="background:red; color:white;">Reddet</button>
     </div>
 
     <div class="sidebar">
-        <h3>🟢 Aktif Kişiler</h3>
-        <div id="userList" style="flex:1;"></div>
-        <a href="/logout" style="color:gray; text-decoration:none; font-size:12px; margin-top:10px;">Çıkış Yap</a>
+        <h3>Aktifler</h3>
+        <div id="userList"></div>
     </div>
 
     <div class="main">
-        <h3>Kullanıcı: {{ session['username'] }}</h3>
-        <div id="status" style="color:#f1c40f; font-weight:bold; margin-bottom:10px;">Sistem Hazır</div>
-        
-        <div class="video-area">
+        <div id="status" style="color:yellow;">Sistem Hazır</div>
+        <div style="display:flex; gap:10px; width:100%; justify-content:center;">
             <video id="localVideo" autoplay playsinline muted></video>
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
+        
+        <button id="endBtn" onclick="endCall()" style="display:none; background:red; color:white; margin:10px; padding:10px;">📞 Aramayı Bitir</button>
 
-        <button onclick="endCall()" id="endBtn" class="cancel-btn" style="display:none; margin-top:10px;">📞 Aramayı Kapat</button>
-
-        <div id="chatBox">
-            <div id="messages"></div>
-            <div id="chatInputArea">
-                <input type="text" id="chatInput" placeholder="Mesaj yazın..." onkeypress="checkEnter(event)">
-                <button onclick="sendMessage()" style="background:#3498db; color:white;">Gönder</button>
-            </div>
+        <div id="chat"></div>
+        <div style="width:90%;">
+            <input type="text" id="mInput" placeholder="Mesajınız...">
+            <button onclick="sendMsg()" style="background:#3498db; color:white; padding:8px;">Gönder</button>
         </div>
     </div>
 
     <script>
+        const socket = io();
+        let myId, peer, currentCall, targetPeerId;
         const localVideo = document.getElementById('localVideo');
         const remoteVideo = document.getElementById('remoteVideo');
-        const statusDiv = document.getElementById('status');
-        const messagesDiv = document.getElementById('messages');
-        const modal = document.getElementById('modal');
-        let myStream, peer, currentCall, conn, myPeerId;
-        let isBusy = false;
 
-        const peerConfig = {
-            config: { 
-                'iceServers': [
-                    { url: 'stun:stun.l.google.com:19302' },
-                    { url: 'stun:global.stun.twilio.com:3478' }
-                ],
-                'iceCandidatePoolSize': 10
-            }
-        };
-
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-            myStream = stream;
+        navigator.mediaDevices.getUserMedia({video:true, audio:true}).then(stream => {
             localVideo.srcObject = stream;
-            peer = new Peer(peerConfig);
+            peer = new Peer({
+                config: {'iceServers': [{url: 'stun:stun.l.google.com:19302'}]}
+            });
 
             peer.on('open', id => {
-                myPeerId = id;
-                heartbeat(id);
-                updateList();
+                myId = id;
+                socket.emit('register', {id: id, user: "{{session['username']}}"});
             });
 
-            // Gelen Veri Bağlantısı (Sohbet ve Komutlar)
-            peer.on('connection', c => {
-                conn = c;
-                setupChat();
-            });
-
-            // Gelen Arama
             peer.on('call', call => {
                 currentCall = call;
-                modal.style.display = 'block';
-                currentCall.on('close', () => cleanUI());
+                document.getElementById('modal').style.display = 'block';
             });
         });
 
-        function setupChat() {
-            conn.on('data', data => {
-                if(data.type === 'msg') {
-                    addMessage(conn.metadata.user, data.text);
-                } else if (data.type === 'reject' || data.type === 'end') {
-                    cleanUI();
-                }
-            });
-            conn.on('close', () => cleanUI());
-        }
+        socket.on('new_msg', data => {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `<b>${data.user}:</b> ${data.txt}`;
+            document.getElementById('chat').appendChild(div);
+        });
+
+        socket.on('force_end', () => {
+            if(currentCall) currentCall.close();
+            remoteVideo.srcObject = null;
+            document.getElementById('endBtn').style.display = 'none';
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('status').innerText = "Bağlantı Kesildi.";
+        });
 
         function makeCall(pId) {
-            isBusy = true;
-            statusDiv.innerText = "Aranıyor...";
-            document.getElementById('endBtn').style.display = 'inline-block';
-            
-            // Hem arama hem sohbet bağlantısı kur
-            conn = peer.connect(pId, { metadata: { user: "{{ session['username'] }}" } });
-            setupChat();
-            
-            currentCall = peer.call(pId, myStream);
-            currentCall.on('stream', rStream => {
-                remoteVideo.srcObject = rStream;
-                statusDiv.innerText = "Bağlandı!";
+            targetPeerId = pId;
+            currentCall = peer.call(pId, localVideo.srcObject);
+            currentCall.on('stream', s => {
+                remoteVideo.srcObject = s;
+                document.getElementById('endBtn').style.display = 'block';
             });
-            currentCall.on('close', () => cleanUI());
-            updateList();
         }
 
         function acceptCall() {
-            modal.style.display = 'none';
-            isBusy = true;
-            document.getElementById('endBtn').style.display = 'inline-block';
-            currentCall.answer(myStream);
-            currentCall.on('stream', rStream => {
-                remoteVideo.srcObject = rStream;
-                statusDiv.innerText = "Bağlandı!";
+            document.getElementById('modal').style.display = 'none';
+            currentCall.answer(localVideo.srcObject);
+            currentCall.on('stream', s => {
+                remoteVideo.srcObject = s;
+                document.getElementById('endBtn').style.display = 'block';
             });
-            updateList();
-        }
-
-        function rejectCall() {
-            if(conn) conn.send({type: 'reject'});
-            modal.style.display = 'none';
-            cleanUI();
         }
 
         function endCall() {
-            if(conn) conn.send({type: 'end'});
+            socket.emit('signal_end', {to: targetPeerId});
             if(currentCall) currentCall.close();
-            cleanUI();
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('chatInput');
-            if(conn && input.value) {
-                conn.send({type: 'msg', text: input.value});
-                addMessage("Ben", input.value);
-                input.value = "";
-            }
-        }
-
-        function addMessage(user, text) {
-            const div = document.createElement('div');
-            div.className = 'msg';
-            div.innerHTML = `<b>${user}:</b> ${text}`;
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
-
-        function checkEnter(e) { if(e.key === 'Enter') sendMessage(); }
-
-        function cleanUI() {
-            isBusy = false;
             remoteVideo.srcObject = null;
-            statusDiv.innerText = "Bağlantı Kesildi.";
             document.getElementById('endBtn').style.display = 'none';
-            modal.style.display = 'none';
-            updateList();
         }
 
-        function heartbeat(id) {
-            fetch(`/register_peer?id=${id}`);
-            setTimeout(() => heartbeat(id), 4000);
+        function rejectCall() {
+            socket.emit('signal_end', {to: targetPeerId});
+            document.getElementById('modal').style.display = 'none';
         }
 
-        async function updateList() {
-            const res = await fetch('/get_online_users');
-            const users = await res.json();
-            const listDiv = document.getElementById('userList');
-            listDiv.innerHTML = "";
+        function sendMsg() {
+            const txt = document.getElementById('mInput').value;
+            socket.emit('send_msg', {txt: txt, user: "{{session['username']}}"});
+            document.getElementById('mInput').value = "";
+        }
+
+        socket.on('update_users', users => {
+            const list = document.getElementById('userList');
+            list.innerHTML = "";
             users.forEach(u => {
-                if (u.peer_id !== myPeerId) {
-                    listDiv.innerHTML += `
-                        <div class="user-card">
-                            <span>${u.username}</span>
-                            <button class="${isBusy ? 'cancel-btn' : 'call-btn'}" 
-                                    onclick="${isBusy ? 'endCall()' : `makeCall('${u.peer_id}')`}">
-                                ${isBusy ? 'İptal' : 'Ara'}
-                            </button>
-                        </div>`;
+                if(u.peer_id !== myId) {
+                    list.innerHTML += `<div class="user-card">${u.username} <button onclick="makeCall('${u.peer_id}')">Ara</button></div>`;
                 }
             });
-        }
-        setInterval(updateList, 5000);
+        });
     </script>
 </body>
 </html>
 """
 
-@app.route('/')
-def home():
-    if "username" not in session: return redirect('/login')
-    return render_template_string(UI_HTML)
-
-@app.route('/register_peer')
-def register_peer():
-    pid = request.args.get('id')
-    if pid and "username" in session:
-        with sqlite3.connect(DB) as con:
-            con.execute("INSERT OR REPLACE INTO online_peers (peer_id, username, last_seen) VALUES (?,?,?)", 
-                        (pid, session["username"], time.time()))
-    return "ok"
-
-@app.route('/get_online_users')
-def get_online_users():
-    now = time.time()
+@socketio.on('register')
+def handle_reg(data):
     with sqlite3.connect(DB) as con:
-        con.execute("DELETE FROM online_peers WHERE last_seen < ?", (now - 10,))
+        con.execute("INSERT OR REPLACE INTO online_peers VALUES (?,?,?)", (data['id'], data['user'], time.time()))
+    update_all()
+
+@socketio.on('send_msg')
+def handle_msg(data):
+    emit('new_msg', data, broadcast=True)
+
+@socketio.on('signal_end')
+def handle_end(data):
+    emit('force_end', room=data.get('to'), broadcast=True)
+
+def update_all():
+    with sqlite3.connect(DB) as con:
         cur = con.cursor()
         cur.execute("SELECT peer_id, username FROM online_peers")
-        return jsonify([{"peer_id": r[0], "username": r[1]} for r in cur.fetchall()])
+        users = [{"peer_id": r[0], "username": r[1]} for r in cur.fetchall()]
+        emit('update_users', users, broadcast=True)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/')
+def index():
+    if 'username' not in session: return redirect('/login')
+    return render_template_string(UI_HTML)
+
+@app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        u = request.form['u']
-        session["username"] = u
+        session['username'] = request.form['u']
         return redirect('/')
-    return '<body style="background:#0f1216;color:white;text-align:center;padding-top:100px;"><form method="post"><h2>Giriş</h2><input name="u" placeholder="Adınız" required><br><br><button>Gir</button></form></body>'
-
-@app.route('/logout')
-def logout():
-    if "username" in session:
-        with sqlite3.connect(DB) as con:
-            con.execute("DELETE FROM online_peers WHERE username=?", (session["username"],))
-    session.clear()
-    return redirect('/login')
+    return '<form method="post"><input name="u" placeholder="Adınız"><button>Gir</button></form>'
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    socketio.run(app, host="0.0.0.0", port=5000)
