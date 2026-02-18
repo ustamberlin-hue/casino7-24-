@@ -2,126 +2,99 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Casino 7-24 Canlı</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino 7-24 | Profesyonel Sohbet</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0a0a0a; color: white; display: flex; height: 100vh; margin: 0; }
-        #side { width: 220px; background: #111; border-right: 2px solid #ff4500; padding: 15px; }
-        #main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px; }
-        .video-wrap { display: flex; width: 100%; justify-content: center; gap: 10px; margin-bottom: 10px; }
-        video { width: 45%; height: 260px; background: black; border: 2px solid #333; border-radius: 10px; object-fit: cover; }
-        #chat { width: 90%; height: 220px; background: #161616; overflow-y: auto; padding: 10px; border-radius: 8px; margin: 10px 0; border: 1px solid #222; }
-        .user-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #222; transition: 0.2s; }
-        .user-item:hover { background: #ff4500; color: black; }
-        .btns { display: flex; gap: 10px; margin-bottom: 10px; }
-        button { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; }
-        #msg-input { padding: 12px; width: 65%; border-radius: 6px; border: none; background: #222; color: white; }
+        :root { --main-orange: #ff4500; --bg-dark: #121212; --panel-bg: #1e1e1e; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-dark); color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sol Panel - Üyeler */
+        #side-panel { width: 260px; background: var(--panel-bg); border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .panel-header { padding: 20px; border-bottom: 1px solid #333; color: var(--main-orange); font-weight: bold; }
+        .user-list { flex: 1; overflow-y: auto; }
+        .user-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid #252525; display: flex; justify-content: space-between; }
+        .user-item:hover { background: #252525; }
+
+        /* Orta Alan - Sohbet */
+        #main-chat { flex: 1; display: flex; flex-direction: column; }
+        .chat-header { padding: 15px; background: #1a1a1a; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Mesaj Kutusu ve Butonlar */
+        .input-area { padding: 20px; background: #1a1a1a; display: flex; gap: 10px; }
+        input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; font-size: 16px; }
+        button { padding: 10px 20px; border-radius: 8px; border: none; background: var(--main-orange); color: white; font-weight: bold; cursor: pointer; }
+
+        /* Mobil Uyumluluk */
+        @media (max-width: 768px) {
+            #side-panel { width: 80px; }
+            .user-item span { display: none; }
+        }
     </style>
 </head>
 <body>
-    <div id="side">
-        <h3>👥 Üyeler</h3>
-        <div id="user-list">Bağlanıyor...</div>
+    <div id="side-panel">
+        <div class="panel-header">🎰 Casino 7-24</div>
+        <div class="user-list" id="user-list">
+            <div class="user-item" onclick="setTarget('global')">🌍 Genel Lobi</div>
+            </div>
     </div>
-    <div id="main">
-        <h3 id="status-title">🌍 Genel Sohbet</h3>
-        <div class="video-wrap">
-            <video id="localVideo" autoplay playsinline muted></video>
-            <video id="remoteVideo" autoplay playsinline></video>
+
+    <div id="main-chat">
+        <div class="chat-header">
+            <span id="chat-title">🌍 Genel Sohbet</span>
+            <button onclick="showAdmin()" style="background: #333; font-size: 12px;">Admin Paneli</button>
         </div>
-        <div class="btns" id="call-controls" style="display:none;">
-            <button style="background:#28a745; color:white;" onclick="startCall()">📞 Aramayı Başlat</button>
-            <button style="background:#dc3545; color:white;" onclick="closeCall()">✖ Kapat</button>
-        </div>
-        <div id="chat"></div>
-        <div style="width: 100%; text-align: center;">
-            <input type="text" id="msg-input" placeholder="Mesaj yazın (Enter)...">
-            <button onclick="send()" style="background:#ff4500; color:white;">Gönder</button>
+        
+        <div id="messages"></div>
+
+        <div class="input-area">
+            <input type="text" id="msg-input" placeholder="Mesajınızı yazın...">
+            <button id="send-btn" onclick="sendMessage()">GÖNDER</button>
         </div>
     </div>
 
     <script>
         const socket = io();
-        let myName = prompt("Kullanıcı adınız:");
-        let selectedUser = "";
-        let pc; // PeerConnection
-        let localStream;
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        let currentTarget = "global";
+        let myName = prompt("Kullanıcı Adınız:"); // Üyelik sistemi aktifleşene kadar geçici
 
-        if(myName) socket.emit('register', myName);
+        // MOBİL VE BİLGİSAYAR İÇİN MESAJ GÖNDERME TETİKLERİ
+        const msgInput = document.getElementById('msg-input');
 
-        // Kamera Başlat
-        navigator.mediaDevices.getUserMedia({video: true, audio: true})
-            .then(s => { 
-                localStream = s;
-                document.getElementById('localVideo').srcObject = s; 
-            });
-
-        function send() {
-            const input = document.getElementById('msg-input');
-            if(!input.value) return;
-            if(selectedUser) socket.emit('send_private_event', {target: selectedUser, message: input.value, type: 'private'});
-            else socket.emit('send_global_msg', {message: input.value});
-            input.value = "";
-        }
-        document.getElementById('msg-input').onkeypress = e => { if(e.key==='Enter') send(); };
-
-        // Görüntü Bağlantı Fonksiyonları
-        async function startCall() {
-            createPeer(selectedUser);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit('signal', {target: selectedUser, data: offer});
-        }
-
-        function createPeer(targetName) {
-            pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            pc.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-            pc.onicecandidate = e => {
-                if(e.candidate) socket.emit('signal', {target: targetName, data: e.candidate});
-            };
-        }
-
-        socket.on('signal', async (data) => {
-            if(!pc) createPeer(data.sender);
-            if(data.data.type === 'offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(data.data));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit('signal', {target: data.sender, data: answer});
-            } else if(data.data.type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(data.data));
-            } else if(data.data.candidate) {
-                await pc.addIceCandidate(new RTCIceCandidate(data.data));
+        // 1. Bilgisayar: Enter Tuşu
+        msgInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
         });
 
-        socket.on('update_user_list', list => {
-            const div = document.getElementById('user-list');
-            div.innerHTML = "<div class='user-item' onclick='reset()'>🌍 Genel Sohbet</div>";
-            list.forEach(u => {
-                if(u !== myName) {
-                    const item = document.createElement('div');
-                    item.className = "user-item";
-                    item.innerText = u;
-                    item.onclick = () => { 
-                        selectedUser = u; 
-                        document.getElementById('status-title').innerText = "👤 Özel: " + u;
-                        document.getElementById('call-controls').style.display = "flex";
-                    };
-                    div.appendChild(item);
-                }
-            });
+        // 2. Telefon/Bilgisayar: Gönder Butonu (onclick zaten tanımlı)
+
+        function sendMessage() {
+            const msg = msgInput.value.trim();
+            if (!msg) return;
+
+            if (currentTarget === "global") {
+                socket.emit('send_global_msg', {user: myName, msg: msg});
+            } else {
+                socket.emit('send_private_msg', {sender: myName, target: currentTarget, msg: msg});
+            }
+            msgInput.value = "";
+        }
+
+        socket.on('receive_msg', (data) => {
+            const msgDiv = document.getElementById('messages');
+            const color = data.type === 'global' ? '#fff' : var(--main-orange);
+            msgDiv.innerHTML += `<div><b style="color:var(--main-orange)">${data.sender}:</b> ${data.msg}</div>`;
+            msgDiv.scrollTop = msgDiv.scrollHeight;
         });
 
-        function reset() { selectedUser = ""; document.getElementById('call-controls').style.display = "none"; }
-        
-        socket.on('receive_msg', d => {
-            const area = document.getElementById('chat');
-            area.innerHTML += `<div><b>${d.sender}:</b> ${d.message}</div>`;
-            area.scrollTop = area.scrollHeight;
-        });
+        function setTarget(t) {
+            currentTarget = t;
+            document.getElementById('chat-title').innerText = t === 'global' ? '🌍 Genel Sohbet' : '👤 Özel: ' + t;
+        }
     </script>
 </body>
 </html>
