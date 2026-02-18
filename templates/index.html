@@ -37,43 +37,55 @@
     </div>
 
     <script>
-        const socket = io();
-        let selectedUser = "";
+    const socket = io();
+    let selectedUser = "";
+    let myName = prompt("Lütfen kullanıcı adınızı girin:");
 
-        socket.on('update_user_list', (userNames) => {
-            const list = document.getElementById('user-list');
-            list.innerHTML = "";
-            userNames.forEach(name => {
+    if(myName) {
+        socket.emit('register', myName);
+    }
+
+    // ENTER TUŞU ÖZELLİĞİ
+    document.getElementById('msg-input').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendMsg();
+        }
+    });
+
+    function sendMsg() {
+        const input = document.getElementById('msg-input');
+        const msg = input.value;
+        if(selectedUser && msg) {
+            socket.emit('send_private_msg', {target: selectedUser, message: msg});
+            input.value = "";
+        } else if(!selectedUser) {
+            alert("Önce soldan mesaj atacağınız kişiyi seçin!");
+        }
+    }
+
+    socket.on('update_user_list', (userNames) => {
+        const list = document.getElementById('user-list');
+        list.innerHTML = "";
+        userNames.forEach(name => {
+            if(name !== myName) { // Kendini listede görme
                 const div = document.createElement('div');
                 div.className = "user-item";
                 div.innerText = name;
                 div.onclick = () => { 
                     selectedUser = name; 
-                    alert(name + " ile sohbete başlandı!");
+                    document.getElementById('chat-window').innerHTML += `<div><b>Sistem:</b> ${name} ile sohbete başlandı.</div>`;
                 };
                 list.appendChild(div);
-            });
-        });
-
-        function sendMsg() {
-            const msg = document.getElementById('msg-input').value;
-            if(selectedUser && msg) {
-                socket.emit('send_private_msg', {target: selectedUser, message: msg});
-                document.getElementById('msg-input').value = "";
-            } else {
-                alert("Önce bir kullanıcı seçmelisiniz!");
             }
-        }
-
-        socket.on('receive_private_msg', (data) => {
-            const chat = document.getElementById('chat-window');
-            chat.innerHTML += `<div><b>${data.sender}:</b> ${data.message}</div>`;
-            chat.scrollTop = chat.scrollHeight;
         });
+    });
 
-        // Kamera Başlatma
-        navigator.mediaDevices.getUserMedia({video: true, audio: true})
-            .then(stream => { document.getElementById('localVideo').srcObject = stream; });
-    </script>
+    socket.on('receive_private_msg', (data) => {
+        const chat = document.getElementById('chat-window');
+        chat.innerHTML += `<div><b style="color:#ff4500">${data.sender}:</b> ${data.message}</div>`;
+        chat.scrollTop = chat.scrollHeight;
+    });
+</script>
+
 </body>
 </html>
