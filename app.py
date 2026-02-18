@@ -2,56 +2,92 @@ import os
 from flask import Flask, render_template_string
 
 app = Flask(__name__)
-app.secret_key = "sohbet_odasi_2026"
+app.secret_key = "goruntulu_sohbet_2026_pro"
 
-# ---------------- GÖRSEL TASARIM VE GÖRÜNTÜ KODU ----------------
-# Bu HTML, tarayıcının kamerasını açar ve diğer kişiye bağlanmayı sağlar.
+# ---------------- GÖRSEL VE BAĞLANTI KODU (HTML/JS) ----------------
+# Bu kod PeerJS kütüphanesini kullanarak karmaşık sunucu işlemlerini otomatiğe bağlar.
 SOHBET_HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-    <title>Canlı Görüntülü Sohbet</title>
+    <meta charset="UTF-8">
+    <title>Canlı Görüntülü Sohbet Odası</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #121212; color: white; font-family: sans-serif; text-align: center; }
-        .video-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
-        video { background: #333; width: 45%; max-width: 400px; border-radius: 15px; border: 3px solid #3498db; }
-        .controls { margin-top: 20px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #27ae60; color: white; }
+        body { background: #0f0f0f; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .main-container { max-width: 900px; margin: auto; }
+        .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        video { width: 100%; background: #222; border-radius: 15px; border: 2px solid #3498db; transform: scaleX(-1); }
+        .info-box { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-bottom: 4px solid #27ae60; }
+        input { padding: 10px; border-radius: 5px; border: none; width: 200px; }
+        button { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-call { background: #e74c3c; color: white; }
+        .btn-start { background: #27ae60; color: white; }
     </style>
 </head>
 <body>
-    <h1>🎥 Görüntülü Sohbet Odası</h1>
-    <p>Oda ID: <strong>Genel Oda</strong></p>
-    
-    <div class="video-container">
-        <div>
-            <p>Senin Görüntün</p>
-            <video id="localVideo" autoplay playsinline muted></video>
+    <div class="main-container">
+        <h1>🎥 PRO Görüntülü Sohbet</h1>
+        
+        <div class="info-box">
+            <p>Senin Numaran (ID): <strong id="my-id" style="color: #f1c40f;">Yükleniyor...</strong></p>
+            <p style="font-size: 12px; color: #888;">Bu numarayı arkadaşına gönder, seni arasın!</p>
         </div>
-        <div>
-            <p>Karşıdaki Kişi</p>
-            <video id="remoteVideo" autoplay playsinline></video>
-        </div>
-    </div>
 
-    <div class="controls">
-        <button onclick="startVideo()">Kamerayı Aç</button>
+        <div class="controls">
+            <input type="text" id="peer-id" placeholder="Arkadaşının ID'sini yaz...">
+            <button class="btn-call" onclick="makeCall()">ARA</button>
+        </div>
+
+        <div class="video-grid">
+            <div>
+                <p>Kendi Kameran</p>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+            <div>
+                <p>Arkadaşının Görüntüsü</p>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+        </div>
     </div>
 
     <script>
-        let localStream;
         const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        let myStream;
+        let peer;
 
-        async function startVideo() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                localVideo.srcObject = localStream;
-            } catch (error) {
-                alert("Kameraya ulaşılamadı! Lütfen izin verin.");
-            }
+        // 1. Kamerayı ve Mikrofonu Başlat
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+            myStream = stream;
+            localVideo.srcObject = stream;
+            
+            // 2. Peer Bağlantısını Kur (Kamera açılmadan ID alma)
+            peer = new Peer(); 
+
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = id;
+            });
+
+            // 3. Gelen Aramayı Cevapla
+            peer.on('call', (call) => {
+                call.answer(myStream);
+                call.on('stream', (userRemoteStream) => {
+                    remoteVideo.srcObject = userRemoteStream;
+                });
+            });
+        });
+
+        // 4. Arkadaşını Ara
+        function makeCall() {
+            const remoteId = document.getElementById('peer-id').value;
+            if(!remoteId) return alert("Lütfen bir ID girin!");
+            
+            const call = peer.call(remoteId, myStream);
+            call.on('stream', (userRemoteStream) => {
+                remoteVideo.srcObject = userRemoteStream;
+            });
         }
-        // Not: Gerçek bir bağlantı için (WebRTC Signaling) ek bir sunucu servisi gerekir. 
-        // Bu temel kod şu an kameranı açmanı ve görüntünü görmeni sağlar.
     </script>
 </body>
 </html>
