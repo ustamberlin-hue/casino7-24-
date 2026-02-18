@@ -1,44 +1,51 @@
-import os
-from flask import Flask, render_template, request, session
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, jsonify, request
+import random
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'neon_casino_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Kullanıcı verileri: {sid: {"name": "Ali", "role": "VIP", "active": True}}
-users = {}
+# Geçici veri tabanı (Gerçek bir projede SQL kullanılır)
+player_data = {
+    "username": "Hero_Developer",
+    "level": 1,
+    "hp": 100,
+    "max_hp": 100,
+    "stars": 0,
+    "xp": 0
+}
 
 @app.route('/')
 def index():
+    # Bu rota, hazırladığımız HTML sayfasını kullanıcıya sunar
     return render_template('index.html')
 
-@socketio.on('register')
-def handle_register(username):
-    # İlk giren Admin olsun, sonrakiler Üye
-    role = "Admin" if len(users) == 0 else "Üye"
-    users[request.sid] = {"name": username, "role": role}
-    emit('update_users', list(users.values()), broadcast=True)
+@app.route('/battle/attack', methods=['POST'])
+def attack():
+    global player_data
+    action = request.json.get('action')
+    
+    # Savaş Mantığı Arka Planda Dönüyor
+    enemy_hp_loss = 0
+    player_hp_loss = 0
+    message = ""
 
-@socketio.on('send_msg')
-def handle_msg(data):
-    sender_info = users.get(request.sid)
-    if not sender_info: return
+    if action == "code_attack":
+        enemy_hp_loss = random.randint(15, 25)
+        message = f"Kod saldırısı başarılı! {enemy_hp_loss} hasar verildi."
+    elif action == "merge_strike":
+        enemy_hp_loss = random.randint(5, 40)
+        message = f"Tehlikeli bir Merge! {enemy_hp_loss} hasar!"
+    
+    # Düşman da karşı saldırı yapar (Simülasyon)
+    player_hp_loss = random.randint(8, 15)
+    player_data["hp"] -= player_hp_loss
 
-    payload = {
-        "sender": sender_info['name'],
-        "role": sender_info['role'],
-        "msg": data['msg'],
-        "target": data['target']
-    }
-
-    if data['target'] == 'global':
-        emit('receive_msg', payload, broadcast=True)
-    else:
-        # Özel mesaj: Sadece alıcıya ve gönderene
-        for sid, info in users.items():
-            if info['name'] == data['target'] or sid == request.sid:
-                emit('receive_msg', payload, room=sid)
+    # Sonuçları Frontend'e (HTML) geri gönder
+    return jsonify({
+        "message": message,
+        "enemy_damage": enemy_hp_loss,
+        "player_damage": player_hp_loss,
+        "current_player_hp": player_data["hp"]
+    })
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=True)
