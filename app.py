@@ -1,11 +1,10 @@
 import os
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit, join_room
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# {sid: username}
 users = {}
 
 @app.route('/')
@@ -23,15 +22,19 @@ def handle_disconnect():
         del users[request.sid]
         emit('update_user_list', list(users.values()), broadcast=True)
 
-# GENEL SOHBET
 @socketio.on('send_global_msg')
 def handle_global_msg(data):
     emit('receive_msg', {'sender': users[request.sid], 'message': data['message'], 'type': 'global'}, broadcast=True)
 
-# ÖZEL SOHBET VE ARAMA İSTEĞİ
+# GÖRÜNTÜ SİNYAL TAŞIYICI (KRİTİK KISIM)
+@socketio.on('signal')
+def handle_signal(data):
+    target_sid = next((sid for sid, name in users.items() if name == data['target']), None)
+    if target_sid:
+        emit('signal', {'sender': users[request.sid], 'data': data['data']}, room=target_sid)
+
 @socketio.on('send_private_event')
 def handle_private_event(data):
-    # data: {'target': 'isim', 'message': '...', 'type': 'private/call_req/call_cancel'}
     target_sid = next((sid for sid, name in users.items() if name == data['target']), None)
     if target_sid:
         emit('receive_msg', {'sender': users[request.sid], 'message': data.get('message', ''), 'type': data['type']}, room=target_sid)
