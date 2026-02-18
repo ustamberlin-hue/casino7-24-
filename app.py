@@ -1,57 +1,41 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template_string, jsonify, request
+import os
 import random
 
 app = Flask(__name__)
 
-# Geçici veri tabanı (Gerçek bir projede SQL kullanılır)
-player_data = {
-    "username": "Hero_Developer",
-    "level": 1,
-    "hp": 100,
-    "max_hp": 100,
-    "stars": 0,
-    "xp": 0
-}
+# OYUNUN GÖRSELİ (HTML BURADA)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>The Commit Theory - CANLI</title>
+    <style>
+        body { background: #0d1117; color: #c9d1d9; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .box { border: 2px solid #58a6ff; padding: 20px; display: inline-block; border-radius: 10px; background: #161b22; }
+        h1 { color: #58a6ff; }
+        button { background: #238636; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🚀 OYUN BAŞLADI!</h1>
+        <p>GitHub Savaşçısı Hoş Geldin.</p>
+        <div id="stats">Level: 1 | HP: 100</div>
+        <br>
+        <button onclick="alert('Kod Saldırısı Yapıldı!')">SALDIRI YAP</button>
+    </div>
+</body>
+</html>
+"""
 
 @app.route('/')
 def index():
-    # Bu rota, hazırladığımız HTML sayfasını kullanıcıya sunar
-    return render_template('index.html')
-
-@app.route('/battle/attack', methods=['POST'])
-def attack():
-    global player_data
-    action = request.json.get('action')
-    
-    # Savaş Mantığı Arka Planda Dönüyor
-    enemy_hp_loss = 0
-    player_hp_loss = 0
-    message = ""
-
-    if action == "code_attack":
-        enemy_hp_loss = random.randint(15, 25)
-        message = f"Kod saldırısı başarılı! {enemy_hp_loss} hasar verildi."
-    elif action == "merge_strike":
-        enemy_hp_loss = random.randint(5, 40)
-        message = f"Tehlikeli bir Merge! {enemy_hp_loss} hasar!"
-    
-    # Düşman da karşı saldırı yapar (Simülasyon)
-    player_hp_loss = random.randint(8, 15)
-    player_data["hp"] -= player_hp_loss
-
-    # Sonuçları Frontend'e (HTML) geri gönder
-    return jsonify({
-        "message": message,
-        "enemy_damage": enemy_hp_loss,
-        "player_damage": player_hp_loss,
-        "current_player_hp": player_data["hp"]
-    })
-
-import os
+    # Templates klasörüne gerek kalmadan direkt HTML'i basar
+    return render_template_string(HTML_TEMPLATE)
 
 if __name__ == '__main__':
-    # Render'ın verdiği portu al, yoksa 5000 kullan
+    # Render için gerekli port ayarları
     port = int(os.environ.get("PORT", 5000))
-    # Host mutlaka 0.0.0.0 olmalı!
     app.run(host='0.0.0.0', port=port)
-    
