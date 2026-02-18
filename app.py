@@ -47,5 +47,11 @@ def attack():
         "current_player_hp": player_data["hp"]
     })
 
+import os
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Render'ın verdiği portu al, yoksa 5000 kullan
+    port = int(os.environ.get("PORT", 5000))
+    # Host mutlaka 0.0.0.0 olmalı!
+    app.run(host='0.0.0.0', port=port)
+    
