@@ -1,101 +1,159 @@
-import os
-from flask import Flask, render_template_string
+import os, sqlite3
+from flask import Flask, request, redirect, session, render_template_string
 
 app = Flask(__name__)
-app.secret_key = "goruntulu_sohbet_2026_pro"
+app.secret_key = "rastgele_sohbet_secret_2026"
+DB = "chat.db"
 
-# ---------------- GÖRSEL VE BAĞLANTI KODU (HTML/JS) ----------------
-# Bu kod PeerJS kütüphanesini kullanarak karmaşık sunucu işlemlerini otomatiğe bağlar.
+# ---------------- 1. VERİ TABANI (Kullanıcı ve Aktif Peer Listesi) ----------------
+def init_db():
+    with sqlite3.connect(DB) as con:
+        cur = con.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT)")
+        # Aktif kullanıcıların Peer ID'lerini tutan tablo
+        cur.execute("CREATE TABLE IF NOT EXISTS online_peers (peer_id TEXT PRIMARY KEY, user_id INTEGER)")
+init_db()
+
+# ---------------- 2. GÖRSEL TASARIM (HTML/JS) ----------------
 SOHBET_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Canlı Görüntülü Sohbet Odası</title>
+    <title>Rastgele Görüntülü Sohbet</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #0f0f0f; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .main-container { max-width: 900px; margin: auto; }
-        .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-        video { width: 100%; background: #222; border-radius: 15px; border: 2px solid #3498db; transform: scaleX(-1); }
-        .info-box { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-bottom: 4px solid #27ae60; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 200px; }
-        button { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-call { background: #e74c3c; color: white; }
-        .btn-start { background: #27ae60; color: white; }
+        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 10px; }
+        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
+        video { width: 45%; max-width: 400px; background: #000; border-radius: 15px; border: 2px solid #3498db; transform: scaleX(-1); }
+        .controls { margin-top: 25px; display: flex; justify-content: center; gap: 10px; }
+        button { padding: 12px 25px; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-next { background: #e67e22; color: white; font-size: 18px; }
+        .btn-mute { background: #95a5a6; color: white; }
+        .muted { background: #e74c3c !important; }
+        .status { color: #2ecc71; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <h1>🎥 PRO Görüntülü Sohbet</h1>
-        
-        <div class="info-box">
-            <p>Senin Numaran (ID): <strong id="my-id" style="color: #f1c40f;">Yükleniyor...</strong></p>
-            <p style="font-size: 12px; color: #888;">Bu numarayı arkadaşına gönder, seni arasın!</p>
-        </div>
+    <h1>🌟 Rastgele Sohbet Odası</h1>
+    <div id="status" class="status">Kamera hazırlanıyor...</div>
 
-        <div class="controls">
-            <input type="text" id="peer-id" placeholder="Arkadaşının ID'sini yaz...">
-            <button class="btn-call" onclick="makeCall()">ARA</button>
-        </div>
+    <div class="video-container">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
 
-        <div class="video-grid">
-            <div>
-                <p>Kendi Kameran</p>
-                <video id="localVideo" autoplay playsinline muted></video>
-            </div>
-            <div>
-                <p>Arkadaşının Görüntüsü</p>
-                <video id="remoteVideo" autoplay playsinline></video>
-            </div>
-        </div>
+    <div class="controls">
+        <button id="muteBtn" class="btn-mute" onclick="toggleAudio()">🎤 Sesi Kapat</button>
+        <button class="btn-next" onclick="findRandomPerson()">🎲 SONRAKİ KİŞİ</button>
+        <a href="/logout"><button style="background:none; color:gray;">Çıkış</button></a>
     </div>
 
     <script>
         const localVideo = document.getElementById('localVideo');
         const remoteVideo = document.getElementById('remoteVideo');
-        let myStream;
-        let peer;
+        const statusDiv = document.getElementById('status');
+        let myStream, peer, currentCall;
+        let isMuted = false;
 
-        // 1. Kamerayı ve Mikrofonu Başlat
+        // 1. Kamerayı Başlat ve Peer ID Al
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             myStream = stream;
             localVideo.srcObject = stream;
             
-            // 2. Peer Bağlantısını Kur (Kamera açılmadan ID alma)
             peer = new Peer(); 
-
             peer.on('open', (id) => {
-                document.getElementById('my-id').innerText = id;
+                statusDiv.innerText = "Bağlanmaya hazır!";
+                // Peer ID'yi sunucuya kaydet
+                fetch('/register_peer?id=' + id);
             });
 
-            // 3. Gelen Aramayı Cevapla
+            // 2. Gelen aramaları otomatik kabul et
             peer.on('call', (call) => {
+                currentCall = call;
                 call.answer(myStream);
-                call.on('stream', (userRemoteStream) => {
-                    remoteVideo.srcObject = userRemoteStream;
+                call.on('stream', (remoteStream) => {
+                    remoteVideo.srcObject = remoteStream;
+                    statusDiv.innerText = "Birine bağlandın!";
                 });
             });
         });
 
-        // 4. Arkadaşını Ara
-        function makeCall() {
-            const remoteId = document.getElementById('peer-id').value;
-            if(!remoteId) return alert("Lütfen bir ID girin!");
+        // 3. Rastgele Birini Bul ve Ara
+        async function findRandomPerson() {
+            statusDiv.innerText = "Aranıyor...";
+            const res = await fetch('/get_random_peer');
+            const data = await res.json();
             
-            const call = peer.call(remoteId, myStream);
-            call.on('stream', (userRemoteStream) => {
-                remoteVideo.srcObject = userRemoteStream;
-            });
+            if (data.peer_id && data.peer_id !== peer.id) {
+                if (currentCall) currentCall.close();
+                const call = peer.call(data.peer_id, myStream);
+                currentCall = call;
+                call.on('stream', (remoteStream) => {
+                    remoteVideo.srcObject = remoteStream;
+                    statusDiv.innerText = "Yeni birine bağlandın!";
+                });
+            } else {
+                statusDiv.innerText = "Şu an kimse yok, tekrar dene!";
+            }
+        }
+
+        // 4. Ses Aç/Kapat
+        function toggleAudio() {
+            isMuted = !isMuted;
+            myStream.getAudioTracks()[0].enabled = !isMuted;
+            const btn = document.getElementById('muteBtn');
+            btn.innerText = isMuted ? "🎤 Sesi Aç" : "🎤 Sesi Kapat";
+            btn.classList.toggle('muted', isMuted);
         }
     </script>
 </body>
 </html>
 """
 
+# ---------------- 3. ROUTES ----------------
 @app.route('/')
 def index():
+    if "user_id" not in session: return redirect('/login')
     return render_template_string(SOHBET_HTML)
+
+@app.route('/register_peer')
+def register_peer():
+    peer_id = request.args.get('id')
+    if peer_id and "user_id" in session:
+        with sqlite3.connect(DB) as con:
+            con.execute("INSERT OR REPLACE INTO online_peers (peer_id, user_id) VALUES (?,?)", (peer_id, session["user_id"]))
+    return "ok"
+
+@app.route('/get_random_peer')
+def get_random_peer():
+    with sqlite3.connect(DB) as con:
+        cur = con.cursor()
+        # Kendisi hariç rastgele bir aktif kullanıcı seç
+        cur.execute("SELECT peer_id FROM online_peers WHERE user_id != ? ORDER BY RANDOM() LIMIT 1", (session.get("user_id", 0),))
+        row = cur.fetchone()
+        return {"peer_id": row[0] if row else None}
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        u, p = request.form['u'], request.form['p']
+        with sqlite3.connect(DB) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM users WHERE username=? AND password=?", (u, p))
+            user = cur.fetchone()
+            if not user: # Kullanıcı yoksa oluştur (Pratik olması için)
+                con.execute("INSERT INTO users (username, password) VALUES (?,?)", (u, p))
+                cur.execute("SELECT * FROM users WHERE username=?", (u,))
+                user = cur.fetchone()
+            session["user_id"] = user[0]
+            return redirect('/')
+    return '<h2>Giriş / Kayıt</h2><form method="post"><input name="u" placeholder="Kullanıcı"><br><input name="p" type="password" placeholder="Şifre"><br><button>Giriş Yap</button></form>'
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
