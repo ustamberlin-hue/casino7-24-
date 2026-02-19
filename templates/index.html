@@ -3,208 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Türkiye Klan Savaşları: ONLINE MEGA</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-    
+    <title>Türkiye Klan Savaşları: 81 İL ONLINE</title>
     <style>
-        :root { --gold: #d4af37; --red: #ff4500; --dark: #0a0e14; --blue: #00d4ff; --gray: #1a1a1a; }
+        :root { --gold: #d4af37; --red: #ff4500; --dark: #0a0e14; --blue: #00d4ff; }
+        body { margin: 0; background: var(--dark); color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        body { margin: 0; background: var(--dark); color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; transition: 0.3s; }
+        /* SALDIRI EFEKTİ */
+        @keyframes shake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-1px, -2px); } 100% { transform: translate(1px, 1px); } }
+        .attacking-shake { animation: shake 0.1s infinite; }
+        @keyframes bg-flash { 0% { background: #0a0e14; } 50% { background: #200; } 100% { background: #0a0e14; } }
+        .flash-red { animation: bg-flash 0.4s infinite; }
+
+        /* ARAYÜZ TASARIMI */
+        #header { display: flex; justify-content: space-around; padding: 15px; background: #161b22; border-bottom: 2px solid var(--gold); font-weight: bold; }
+        #map-container { position: relative; height: 60vh; background: radial-gradient(circle, #1a2533 0%, #000 100%); display: flex; justify-content: center; align-items: center; }
         
-        /* SALDIRI ANI FLAŞ EFEKTİ */
-        @keyframes flash {
-            0% { box-shadow: inset 0 0 0px var(--red); }
-            50% { box-shadow: inset 0 0 60px var(--red); }
-            100% { box-shadow: inset 0 0 0px var(--red); }
-        }
-        .attacking { animation: flash 0.4s infinite; border: 2px solid var(--red); }
+        /* 81 İL TEMSİLİ (SVG) */
+        svg { width: 90%; height: 90%; filter: drop-shadow(0 0 10px rgba(0,212,255,0.2)); }
+        .city { fill: #222; stroke: #444; stroke-width: 0.5; cursor: pointer; transition: 0.3s; }
+        .city:hover { fill: var(--blue); stroke: #fff; }
+        .occupied { fill: var(--red) !important; stroke: var(--gold); stroke-width: 1.5; filter: drop-shadow(0 0 8px var(--red)); }
 
-        /* GİRİŞ EKRANI */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a2533 0%, #0a0e14 100%); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .auth-card { background: rgba(22, 27, 34, 0.98); padding: 40px; border-radius: 20px; border: 2px solid var(--gold); width: 340px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-        input { width: 90%; padding: 12px; margin: 10px 0; background: #0d1117; border: 1px solid #30363d; color: white; border-radius: 8px; outline: none; }
-        .btn-gold { width: 100%; padding: 15px; background: var(--gold); color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 16px; text-transform: uppercase; }
+        /* SAVAŞ PANELİ */
+        #battle-hud { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); border: 1px solid var(--red); padding: 15px; border-radius: 8px; min-width: 180px; text-align: center; }
+        .hp-container { width: 100%; height: 10px; background: #333; margin-top: 10px; border-radius: 5px; overflow: hidden; }
+        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f00, #ff4500); transition: 0.1s; }
 
-        /* ANA OYUN */
-        #game-screen { display: none; height: 100vh; flex-direction: column; }
+        /* KONTROL PANELİ */
+        #controls { height: 25vh; background: #0d1117; border-top: 2px solid var(--gold); display: flex; align-items: center; justify-content: space-around; padding: 0 20px; }
+        .btn-main { padding: 20px 50px; font-size: 24px; font-weight: bold; color: #fff; background: linear-gradient(to bottom, #ff4500, #8b0000); border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(255,69,0,0.5); text-transform: uppercase; }
+        .btn-main:active { transform: scale(0.95); box-shadow: none; }
         
-        /* MARKET BARI */
-        #market-bar { background: #07090d; border-bottom: 1px solid #333; display: flex; justify-content: center; gap: 15px; padding: 10px; }
-        .weapon-btn { background: var(--gray); border: 1px solid #444; color: white; padding: 8px 18px; cursor: pointer; border-radius: 5px; font-size: 12px; transition: 0.3s; }
-        .weapon-btn:hover { border-color: var(--gold); color: var(--gold); }
-        .weapon-btn.active { background: var(--gold); color: black; font-weight: bold; }
-
-        #header { padding: 12px; text-align: center; border-bottom: 1px solid var(--gold); background: #161b22; display: flex; justify-content: space-around; font-size: 14px; color: #ccc; }
-        
-        #map-container { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png'), #000; }
-        .city { fill: #1f2a38; stroke: var(--gold); stroke-width: 1; cursor: pointer; transition: 0.3s; }
-        .city:hover { fill: var(--blue); }
-        .selected { fill: var(--red) !important; filter: drop-shadow(0 0 15px var(--red)); }
-
-        #battle-stats { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.95); padding: 15px; border-radius: 12px; border: 2px solid var(--red); display: none; min-width: 220px; box-shadow: 0 0 20px rgba(255,0,0,0.2); }
-        #hp-bar-bg { width: 100%; height: 14px; background: #222; border-radius: 7px; margin: 10px 0; overflow: hidden; border: 1px solid #444; }
-        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4500, #8b0000); transition: 0.1s; }
-
-        /* CHAT VE PANEL */
-        #footer { height: 170px; background: #0d1117; border-top: 3px solid var(--gold); display: flex; justify-content: space-around; align-items: center; padding: 0 20px; }
-        .chat-container { display: flex; flex-direction: column; width: 350px; }
-        .chat-box { height: 90px; background: #05070a; border: 1px solid #333; font-size: 11px; padding: 8px; overflow-y: auto; color: #aaa; border-radius: 6px; }
-        .chat-input-area { display: flex; margin-top: 5px; }
-        .chat-input { flex-grow: 1; background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 4px 0 0 4px; }
-        .chat-send { background: var(--gold); border: none; padding: 0 15px; cursor: pointer; font-weight: bold; border-radius: 0 4px 4px 0; }
-
-        .btn-attack { padding: 18px 60px; background: linear-gradient(45deg, #8b0000, #ff4500); color: white; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; font-size: 24px; box-shadow: 0 5px 20px rgba(255,69,0,0.4); text-transform: uppercase; }
-        .btn-attack:active { transform: translateY(3px); box-shadow: none; }
+        .rank-badge { font-size: 14px; color: var(--gold); border: 1px solid var(--gold); padding: 2px 8px; border-radius: 4px; margin-left: 5px; }
     </style>
 </head>
-<body>
+<body id="main-body">
 
-    <div id="auth-screen">
-        <h1 style="color:var(--gold); letter-spacing: 8px; margin-bottom: 5px;">TÜRKİYE KLANLARI</h1>
-        <p style="color:#666; font-size:12px; margin-bottom:20px;">GERÇEK ZAMANLI STRATEJİ SAVAŞI</p>
-        <div class="auth-card">
-            <h3 style="color:#fff; margin-top:0;">KOMUTAN GİRİŞİ</h3>
-            <input type="text" id="username" placeholder="Kullanıcı Adı">
-            <input type="password" id="pass" placeholder="Şifre">
-            <button class="btn-gold" onclick="baslat()">CEPHEYE KATIL</button>
-            <p style="font-size:10px; color:#555; margin-top:15px;">Ayarlar ve şifre işlemleri oyun içindedir.</p>
-        </div>
+<div id="header">
+    <div>KOMUTAN: <span id="user-display" style="color:var(--blue)">ADMIN</span> <span id="rank" class="rank-badge">ONBAŞI</span></div>
+    <div>KLAN SEVİYESİ: <span id="lvl-display" style="color:var(--gold)">1</span></div>
+    <div style="color:#0f0">● ONLINE</div>
+</div>
+
+<div id="map-container">
+    <svg id="tr-map" viewBox="0 0 1000 450">
+        <rect x="150" y="80" width="60" height="40" class="city" onclick="selectCity(this, 'İSTANBUL')" />
+        <rect x="420" y="150" width="70" height="50" class="city" onclick="selectCity(this, 'ANKARA')" />
+        <rect x="80" y="220" width="50" height="60" class="city" onclick="selectCity(this, 'İZMİR')" />
+        <rect x="300" y="320" width="80" height="40" class="city" onclick="selectCity(this, 'ANTALYA')" />
+        <rect x="750" y="230" width="70" height="60" class="city" onclick="selectCity(this, 'DİYARBAKIR')" />
+        <rect x="520" y="280" width="60" height="50" class="city" onclick="selectCity(this, 'ADANA')" />
+        <rect x="220" y="180" width="60" height="50" class="city" onclick="selectCity(this, 'BURSA')" />
+        <rect x="850" y="120" width="60" height="50" class="city" onclick="selectCity(this, 'ERZURUM')" />
+        </svg>
+
+    <div id="battle-hud">
+        <div id="target-name" style="font-size:14px; color:var(--red)">HEDEF SEÇİLMEDİ</div>
+        <div class="hp-container"><div id="hp-bar"></div></div>
+        <div id="hp-text" style="font-size:10px; margin-top:5px;">DİRENÇ: %100</div>
+    </div>
+</div>
+
+<div id="controls">
+    <div style="width: 250px;">
+        <div style="font-size:12px; color:#888;">SON AKTİVİTE:</div>
+        <div id="log" style="font-size:11px; color:#ccc; height: 60px; overflow-y: auto;">- Ordu emir bekliyor...</div>
     </div>
 
-    <div id="game-screen">
-        <div id="market-bar">
-            <button class="weapon-btn active" id="w1" onclick="setWeapon(3, 'Piyade Tüfeği', 'w1')">🔫 PİYADE (x3)</button>
-            <button class="weapon-btn" id="w2" onclick="setWeapon(10, 'Ağır Topçu', 'w2')">💥 TOPÇU (x10)</button>
-            <button class="weapon-btn" id="w3" onclick="setWeapon(35, 'SİHA Taarruzu', 'w3')">🛸 SİHA (x35)</button>
-        </div>
+    <button class="btn-main" onmousedown="startAttack()" onmouseup="stopAttack()" ontouchstart="startAttack()" ontouchend="stopAttack()">Saldırıya Asıl!</button>
 
-        <div id="header">
-            <div>KOMUTAN: <b id="p-name" style="color:var(--blue)">---</b></div>
-            <div>DURUM: <b style="color:#00ff00">ONLINE</b></div>
-            <div>BÖLGE: <b id="p-clan" style="color:var(--gold)">BELİRLENMEDİ</b></div>
-            <div style="cursor:pointer" onclick="sifreDegistir()">⚙️ AYARLAR</div>
-        </div>
-
-        <div id="map-container">
-            <svg viewBox="0 0 1000 450" style="width: 85%;">
-                <path d="M180,80 L230,80 L220,110 L170,110 Z" class="city" onclick="ilSec(this, 'İSTANBUL')" />
-                <path d="M420,150 L510,150 L500,220 L410,220 Z" class="city" onclick="ilSec(this, 'ANKARA')" />
-                <path d="M80,220 L130,220 L120,280 L70,280 Z" class="city" onclick="ilSec(this, 'İZMİR')" />
-                <path d="M750,230 L840,230 L830,300 L740,300 Z" class="city" onclick="ilSec(this, 'DİYARBAKIR')" />
-                <path d="M300,320 L400,320 L390,370 L290,370 Z" class="city" onclick="ilSec(this, 'ANTALYA')" />
-                <path d="M520,280 L600,280 L590,340 L510,340 Z" class="city" onclick="ilSec(this, 'ADANA')" />
-                <text x="400" y="30" fill="var(--gold)" font-size="16" letter-spacing="2">HEDEFİNİ SEÇ VE KUŞATMAYI BAŞLAT</text>
-            </svg>
-
-            <div id="battle-stats">
-                <div id="target-title" style="color:var(--red); font-weight:bold; font-size:18px;">HEDEF: ---</div>
-                <div id="hp-bar-bg"><div id="hp-bar"></div></div>
-                <div id="hp-text" style="font-size:12px; text-align:right;">RAKİP DİRENCİ: %100</div>
-            </div>
-        </div>
-
-        <div id="footer">
-            <div class="chat-container">
-                <div class="chat-box" id="chat"></div>
-                <div class="chat-input-area">
-                    <input type="text" id="chat-msg" class="chat-input" placeholder="Klan mesajı yaz...">
-                    <button class="chat-send" onclick="mesajGonder()">GÖNDER</button>
-                </div>
-            </div>
-
-            <button class="btn-attack" onmousedown="saldir()" onmouseup="dur()">SALDIRIYA ASIL!</button>
-
-            <div style="text-align:center">
-                <div style="font-size:11px; color:#888; margin-bottom:5px;">KLAN SEVİYESİ</div>
-                <div id="lvl" style="font-size:45px; color:var(--gold); font-weight:bold; line-height:1;">1</div>
-            </div>
-        </div>
+    <div style="text-align:center">
+        <div style="font-size:11px;">MÜHİMMAT</div>
+        <div style="font-size:24px; color:var(--gold);">∞</div>
     </div>
+</div>
 
-    <script>
-        let level = 1; let hp = 100; let selectedCity = ""; let attackTimer;
-        let pName = ""; let damagePower = 3;
+<script>
+    let level = 1;
+    let hp = 100;
+    let selectedCity = null;
+    let cityName = "";
+    let attackInterval = null;
 
-        function baslat() {
-            pName = document.getElementById('username').value;
-            if(pName.length < 2) return alert("Komutan adı çok kısa!");
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('game-screen').style.display = 'flex';
-            document.getElementById('p-name').innerText = pName.toUpperCase();
-            mesajEkle("[SİSTEM]", pName + " online oldu. Savaş başlıyor!");
-        }
+    function selectCity(el, name) {
+        if(attackInterval) return;
+        document.querySelectorAll('.city').forEach(c => c.classList.remove('occupied'));
+        el.classList.add('occupied');
+        selectedCity = el;
+        cityName = name;
+        hp = 100;
+        document.getElementById('target-name').innerText = "HEDEF: " + name;
+        updateUI();
+        addLog(name + " kuşatma altına alındı!");
+    }
 
-        function setWeapon(pwr, name, id) {
-            damagePower = pwr;
-            document.querySelectorAll('.weapon-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            mesajEkle("[MARKET]", name + " kuşanıldı. Güç: " + pwr);
-        }
+    function startAttack() {
+        if(!selectedCity) return alert("Önce haritadan bir il seç!");
+        
+        document.getElementById('main-body').classList.add('flash-red');
+        selectedCity.classList.add('attacking-shake');
 
-        function ilSec(el, ad) {
-            selectedCity = ad; hp = 100;
-            document.getElementById('p-clan').innerText = ad + " KLANLARI";
-            document.getElementById('target-title').innerText = "HEDEF: " + ad;
-            document.getElementById('battle-stats').style.display = 'block';
-            document.querySelectorAll('.city').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-            updateUI();
-        }
-
-        function saldir() {
-            if(!selectedCity) return alert("Saldırmak için önce bir il seçmelisiniz!");
-            
-            // Görsel Efekt Başlat (Flaş)
-            document.body.classList.add('attacking');
-
-            attackTimer = setInterval(() => {
-                hp -= damagePower;
-                if(hp <= 0) {
-                    hp = 100; level++;
-                    document.getElementById('lvl').innerText = level;
-                    mesajEkle("[ZAFER]", selectedCity + " bölgesi ele geçirildi! Seviye: " + level);
-                    alert("TEBRİKLER! " + selectedCity + " kalesini düşürdün!");
-                    dur();
-                }
-                updateUI();
-            }, 60);
-        }
-
-        function dur() { 
-            clearInterval(attackTimer); 
-            document.body.classList.remove('attacking');
-        }
-
-        function mesajGonder() {
-            const m = document.getElementById('chat-msg').value;
-            if(!m) return;
-            mesajEkle(pName, m);
-            document.getElementById('chat-msg').value = "";
-        }
-
-        function mesajEkle(sender, msg) {
-            const c = document.getElementById('chat');
-            const d = document.createElement('div');
-            d.style.marginBottom = "3px";
-            d.innerHTML = `<b style="color:var(--gold)">${sender}:</b> <span style="color:#eee">${msg}</span>`;
-            c.appendChild(d);
-            c.scrollTop = c.scrollHeight;
-        }
-
-        function updateUI() {
-            document.getElementById('hp-bar').style.width = hp + "%";
-            document.getElementById('hp-text').innerText = "RAKİP DİRENCİ: %" + Math.max(0, Math.floor(hp));
-        }
-
-        function sifreDegistir() {
-            const s = prompt("Yeni şifrenizi girin:");
-            if(s) {
-                mesajEkle("[SİSTEM]", "Şifre güncelleme talebi alındı.");
-                alert("Şifreniz güncellendi!");
+        attackInterval = setInterval(() => {
+            hp -= 4; // SİHA Gücü
+            if(hp <= 0) {
+                victory();
             }
-        }
-    </script>
+            updateUI();
+        }, 80);
+    }
+
+    function stopAttack() {
+        clearInterval(attackInterval);
+        attackInterval = null;
+        document.getElementById('main-body').classList.remove('flash-red');
+        if(selectedCity) selectedCity.classList.remove('attacking-shake');
+    }
+
+    function victory() {
+        level++;
+        hp = 100;
+        addLog(cityName + " FETHEDİLDİ! +1 Seviye");
+        document.getElementById('lvl-display').innerText = level;
+        updateRank();
+        stopAttack();
+        alert("ZAFER! " + cityName + " artık senin kontrolünde!");
+    }
+
+    function updateRank() {
+        let r = "ONBAŞI";
+        if(level > 10) r = "YÜZBAŞI";
+        if(level > 30) r = "BİNBAŞI";
+        if(level > 50) r = "GENERAL";
+        document.getElementById('rank').innerText = r;
+    }
+
+    function updateUI() {
+        document.getElementById('hp-bar').style.width = hp + "%";
+        document.getElementById('hp-text').innerText = "DİRENÇ: %" + Math.max(0, hp);
+    }
+
+    function addLog(msg) {
+        const log = document.getElementById('log');
+        log.innerHTML = `> ${msg}<br>` + log.innerHTML;
+    }
+</script>
+
 </body>
 </html>
-
