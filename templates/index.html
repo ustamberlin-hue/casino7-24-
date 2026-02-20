@@ -3,35 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sanal İddaa - Canlı Ligler</title>
+    <title>CASINO 7-24 | MULTI-BÜLTEN</title>
     <style>
-        body { background-color: #0b0d10; color: #fff; font-family: sans-serif; margin: 0; }
-        .ust-panel { background: #1c1f26; padding: 20px; text-align: center; border-bottom: 2px solid #00ff41; }
-        .bakiye-skor { color: #00ff41; font-size: 22px; font-weight: bold; }
-        .mac-listesi { padding: 15px; }
-        .mac-kart { background: #16191e; border: 1px solid #2d323a; border-radius: 8px; padding: 15px; margin-bottom: 12px; }
-        .oran-lar { display: flex; gap: 10px; margin-top: 10px; }
-        .oran-btn { background: #2d323a; color: #fff; border: 1px solid #00ff41; padding: 8px; flex: 1; border-radius: 4px; cursor: pointer; }
-        .oran-btn:hover { background: #00ff41; color: #000; }
+        body { background: #0b0e14; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; }
+        .ust-panel { background: #161b22; padding: 15px; border-bottom: 2px solid #00ff41; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; }
+        .kaynak-bar { display: flex; overflow-x: auto; background: #0d1117; padding: 10px; gap: 10px; border-bottom: 1px solid #30363d; }
+        .kaynak-btn { background: #21262d; color: #8b949e; border: 1px solid #30363d; padding: 8px 15px; border-radius: 20px; white-space: nowrap; cursor: pointer; }
+        .kaynak-btn.active { background: #00ff41; color: black; border-color: #00ff41; font-weight: bold; }
+        .mac-kart { background: #1c2128; border: 1px solid #30363d; margin: 10px; padding: 15px; border-radius: 12px; }
+        .lig { font-size: 11px; color: #00ff41; text-transform: uppercase; margin-bottom: 5px; }
+        .takimlar { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 15px; }
+        .oran-row { display: flex; gap: 8px; }
+        .oran { flex: 1; background: #0d1117; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 8px; color: #58a6ff; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="ust-panel">
-        <h1>CASINO 7-24</h1>
-        <div class="bakiye-skor">💰 BAKİYE: {{ bakiye }} TL</div>
+        <b style="color: #00ff41;">CASINO 7-24</b>
+        <span id="bakiye">💰 1000 TL</span>
     </div>
-    <div class="mac-listesi">
-        {% for mac in maclar %}
-        <div class="mac-kart">
-            <strong>{{ mac.strEvent }}</strong><br>
-            <small>{{ mac.strLeague }} | {{ mac.dateEvent }}</small>
-            <div class="oran-lar">
-                <button class="oran-btn">MS 1<br>1.80</button>
-                <button class="oran-btn">MS X<br>3.10</button>
-                <button class="oran-btn">MS 2<br>2.40</button>
-            </div>
-        </div>
-        {% endfor %}
+
+    <div class="kaynak-bar">
+        <div class="kaynak-btn active" onclick="veriyiCek('hititbet')">HITITBET</div>
+        <div class="kaynak-btn" onclick="veriyiCek('misli')">MISLI</div>
+        <div class="kaynak-btn" onclick="veriyiCek('iddaa')">IDDAA</div>
+        <div class="kaynak-btn" onclick="veriyiCek('sanal')">SANAL SPOR</div>
     </div>
+
+    <div id="yukleniyor" style="display:none; text-align:center; padding:20px; color:#8b949e;">Veriler aktarılıyor...</div>
+    <div id="bulten">
+        <p style="text-align:center; padding:50px; color:#8b949e;">Lütfen yukarıdan bir kaynak seçerek bülteni çekin.</p>
+    </div>
+
+    <script>
+        function veriyiCek(kaynak) {
+            // Buton renklerini güncelle
+            document.querySelectorAll('.kaynak-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const bulten = document.getElementById('bulten');
+            const loader = document.getElementById('yukleniyor');
+            
+            loader.style.display = 'block';
+            bulten.style.opacity = '0.3';
+
+            // Python API'sine git (app.py içindeki rotaya)
+            fetch('/api/guncelle?kaynak=' + kaynak)
+                .then(r => r.json())
+                .then(res => {
+                    loader.style.display = 'none';
+                    bulten.style.opacity = '1';
+                    
+                    if(res.status === "success") {
+                        bulten.innerHTML = "";
+                        res.maclar.forEach(m => {
+                            bulten.innerHTML += `
+                                <div class="mac-kart">
+                                    <div class="lig">${m.lig}</div>
+                                    <div class="takimlar"><span>${m.ev}</span> <span>${m.dep}</span></div>
+                                    <div class="oran-row">
+                                        <div class="oran">1<br>${m.o1}</div>
+                                        <div class="oran">X<br>${m.ox}</div>
+                                        <div class="oran">2<br>${m.o2}</div>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                        bulten.innerHTML = `<p style="color:#ff4c4c; text-align:center; padding:20px;">${res.message}</p>`;
+                    }
+                });
+        }
+    </script>
 </body>
 </html>
