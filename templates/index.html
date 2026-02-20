@@ -3,162 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Türkiye Klan Savaşları: GERÇEK 81 İL</title>
+    <title>Sanal İddaa - Canlı Ligler</title>
     <style>
-        :root { --gold: #d4af37; --red: #ff4500; --bg: #0a0e14; --panel: #161b22; --blue: #00d4ff; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        
-        /* MARKET */
-        #market { background: #000; display: flex; justify-content: center; gap: 8px; padding: 10px; border-bottom: 2px solid #333; }
-        .w-btn { background: #222; border: 1px solid var(--gold); color: #fff; padding: 12px; border-radius: 8px; font-size: 11px; flex: 1; font-weight: bold; }
-        .w-btn.active { background: var(--gold); color: #000; box-shadow: 0 0 15px var(--gold); }
-
-        /* ÜST PANEL */
-        #header { display: flex; justify-content: space-around; padding: 10px; background: var(--panel); border-bottom: 2px solid var(--gold); font-size: 12px; }
-
-        /* HARİTA - KARANLIKTAN KURTARILDI */
-        #map-area { 
-            position: relative; 
-            height: 52vh; 
-            background: radial-gradient(circle, #1a2533 0%, #050505 100%); 
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
-        }
-        svg { width: 95%; height: 95%; filter: drop-shadow(0 0 10px rgba(0,212,255,0.2)); }
-        .city { fill: #2a2a2a; stroke: #444; stroke-width: 0.5; cursor: pointer; transition: 0.2s; }
-        .city:hover { fill: var(--blue); stroke: #fff; }
-        .active-city { fill: var(--red) !important; stroke: var(--gold); stroke-width: 1.5; filter: drop-shadow(0 0 10px var(--red)); }
-
-        /* SALDIRI EFEKTİ */
-        @keyframes attack { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-        .is-attacking { animation: attack 0.1s infinite; background: #300 !important; }
-
-        /* SAVAŞ PANELİ */
-        #hud { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.85); border: 2px solid var(--red); padding: 12px; border-radius: 10px; min-width: 180px; text-align: center; }
-        .hp-box { width: 100%; height: 12px; background: #222; margin-top: 8px; border-radius: 6px; overflow: hidden; }
-        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f00, #ff8000); transition: 0.1s; }
-
-        /* ALT PANEL */
-        #footer { height: 25vh; background: var(--panel); border-top: 3px solid var(--gold); display: flex; align-items: center; justify-content: space-around; padding: 0 15px; }
-        #logs { width: 30%; height: 80px; background: #000; font-size: 10px; padding: 8px; color: #0f0; border: 1px solid #333; overflow: hidden; }
-        .btn-main { width: 40%; padding: 20px; font-size: 22px; font-weight: 900; color: #fff; background: linear-gradient(#ff4500, #8b0000); border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(255,69,0,0.5); }
-        .lvl-card { text-align: center; background: #000; padding: 5px 15px; border: 1px solid var(--gold); border-radius: 8px; }
+        body { background-color: #0b0d10; color: #fff; font-family: sans-serif; margin: 0; }
+        .ust-panel { background: #1c1f26; padding: 20px; text-align: center; border-bottom: 2px solid #00ff41; }
+        .bakiye-skor { color: #00ff41; font-size: 22px; font-weight: bold; }
+        .mac-listesi { padding: 15px; }
+        .mac-kart { background: #16191e; border: 1px solid #2d323a; border-radius: 8px; padding: 15px; margin-bottom: 12px; }
+        .oran-lar { display: flex; gap: 10px; margin-top: 10px; }
+        .oran-btn { background: #2d323a; color: #fff; border: 1px solid #00ff41; padding: 8px; flex: 1; border-radius: 4px; cursor: pointer; }
+        .oran-btn:hover { background: #00ff41; color: #000; }
     </style>
 </head>
-<body id="war-room">
-
-    <div id="market">
-        <button class="w-btn active" id="w1" onclick="setW(2.5, 'Piyade', 'w1')">🔫 PİYADE (x3)</button>
-        <button class="w-btn" id="w2" onclick="setW(10, 'Topçu', 'w2')">💥 TOPÇU (x10)</button>
-        <button class="w-btn" id="w3" onclick="setW(35, 'SİHA', 'w3')">🛸 SİHA (x35)</button>
+<body>
+    <div class="ust-panel">
+        <h1>CASINO 7-24</h1>
+        <div class="bakiye-skor">💰 BAKİYE: {{ bakiye }} TL</div>
     </div>
-
-    <div id="header">
-        <div>KOMUTAN: <span style="color:var(--blue)">ADMIN</span></div>
-        <div style="color:#0f0">● ONLINE</div>
-        <div id="clan-tag" style="color:var(--gold)">HEDEF SEÇİLECEK</div>
-    </div>
-
-    <div id="map-area">
-        <svg viewBox="0 0 1000 450" id="turkiye-svg">
-            <path d="M50,150 L120,150 L110,220 L40,220 Z" class="city" data-name="Edirne" onclick="sel(this)"/>
-            <path d="M130,80 L200,80 L190,140 L120,140 Z" class="city" data-name="İstanbul" onclick="sel(this)"/>
-            <path d="M130,150 L200,150 L190,220 L120,220 Z" class="city" data-name="Çanakkale" onclick="sel(this)"/>
-            <path d="M210,130 L280,130 L270,190 L200,190 Z" class="city" data-name="Bursa" onclick="sel(this)"/>
-            <path d="M80,230 L150,230 L140,300 L70,300 Z" class="city" data-name="İzmir" onclick="sel(this)"/>
-            <path d="M400,150 L500,150 L490,230 L390,230 Z" class="city" data-name="Ankara" onclick="sel(this)"/>
-            <path d="M400,240 L500,240 L490,320 L390,320 Z" class="city" data-name="Konya" onclick="sel(this)"/>
-            <path d="M250,320 L350,320 L340,390 L240,390 Z" class="city" data-name="Antalya" onclick="sel(this)"/>
-            <path d="M510,280 L590,280 L580,350 L500,350 Z" class="city" data-name="Adana" onclick="sel(this)"/>
-            <path d="M750,230 L850,230 L840,310 L740,310 Z" class="city" data-name="Diyarbakır" onclick="sel(this)"/>
-            <path d="M860,150 L950,150 L940,230 L850,230 Z" class="city" data-name="Erzurum" onclick="sel(this)"/>
-            <path d="M860,240 L950,240 L940,320 L850,320 Z" class="city" data-name="Van" onclick="sel(this)"/>
-            <path d="M550,70 L640,70 L630,140 L540,140 Z" class="city" data-name="Samsun" onclick="sel(this)"/>
-            <path d="M750,90 L830,90 L820,150 L740,150 Z" class="city" data-name="Trabzon" onclick="sel(this)"/>
-            
-            <text x="400" y="30" fill="var(--gold)" font-size="16" opacity="0.4">TÜRKİYE OPERASYON HARİTASI</text>
-        </svg>
-
-        <div id="hud">
-            <div id="target-name" style="color:var(--red); font-weight:bold; font-size:18px;">HEDEF SEÇİN</div>
-            <div class="hp-box"><div id="hp-bar"></div></div>
-            <div id="hp-txt" style="font-size:11px; margin-top:5px;">DİRENÇ: %100</div>
+    <div class="mac-listesi">
+        {% for mac in maclar %}
+        <div class="mac-kart">
+            <strong>{{ mac.strEvent }}</strong><br>
+            <small>{{ mac.strLeague }} | {{ mac.dateEvent }}</small>
+            <div class="oran-lar">
+                <button class="oran-btn">MS 1<br>1.80</button>
+                <button class="oran-btn">MS X<br>3.10</button>
+                <button class="oran-btn">MS 2<br>2.40</button>
+            </div>
         </div>
+        {% endfor %}
     </div>
-
-    <div id="footer">
-        <div id="logs">> Sistem Hazır.<br>> Emir Bekleniyor.</div>
-        
-        <button class="btn-main" 
-                onmousedown="hit()" 
-                onmouseup="stop()" 
-                onmouseleave="stop()"
-                ontouchstart="hit()" 
-                ontouchend="stop()">SALDIRIYA ASIL!</button>
-
-        <div class="lvl-card">
-            <div style="font-size:10px; color:#888;">SEVİYE</div>
-            <div id="lvl-val" style="font-size:32px; font-weight:bold; color:var(--gold);">1</div>
-        </div>
-    </div>
-
-    <script>
-        let lv = 1; let hp = 100; let target = null; let name = ""; let loop = null; let dmg = 2.5;
-
-        function setW(d, n, id) {
-            dmg = d;
-            document.querySelectorAll('.w-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            addLog(n + " Kuşanıldı.");
-        }
-
-        function sel(el) {
-            if(loop) return;
-            document.querySelectorAll('.city').forEach(c => c.classList.remove('active-city'));
-            el.classList.add('active-city');
-            target = el;
-            name = el.getAttribute('data-name');
-            hp = 100;
-            document.getElementById('target-name').innerText = name.toUpperCase();
-            document.getElementById('clan-tag').innerText = name + " KLANLARI";
-            update();
-            addLog(name + " Kilitlendi.");
-        }
-
-        function hit() {
-            if(!target) return;
-            document.getElementById('war-room').classList.add('is-attacking');
-            loop = setInterval(() => {
-                hp -= dmg;
-                if(hp <= 0) win();
-                update();
-            }, 70);
-        }
-
-        function stop() {
-            clearInterval(loop); loop = null;
-            document.getElementById('war-room').classList.remove('is-attacking');
-        }
-
-        function win() {
-            lv++;
-            hp = 100;
-            document.getElementById('lvl-val').innerText = lv;
-            addLog(name + " FETHEDİLDİ!");
-            stop();
-            alert("ZAFER! " + name + " kontrolün altında.");
-        }
-
-        function update() {
-            document.getElementById('hp-bar').style.width = hp + "%";
-            document.getElementById('hp-txt').innerText = "DİRENÇ: %" + Math.max(0, Math.floor(hp));
-        }
-
-        function addLog(m) {
-            const l = document.getElementById('logs');
-            l.innerHTML = `> ${m}<br>` + l.innerHTML;
-        }
-    </script>
 </body>
 </html>
