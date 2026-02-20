@@ -5,20 +5,12 @@ from flask import Flask, render_template_string, request, session, redirect, url
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'casino_724_unlimited_leagues_99'
+app.secret_key = 'casino_724_ultimate_final_system'
 
-# --- DEV VERİ MOTORU ---
+# --- VERİ MOTORU (DÜNYADAKİ TÜM LİGLER) ---
 
-def oran_uret(mac_id):
-    random.seed(mac_id)
-    return {
-        "1": round(random.uniform(1.20, 5.00), 2),
-        "X": round(random.uniform(3.10, 5.50), 2),
-        "2": round(random.uniform(1.90, 9.00), 2)
-    }
-
-def tum_dunya_bultenini_getir():
-    # 1. ADIM: Sisteme kayıtlı TÜM liglerin listesini çek
+def bulten_topla():
+    # Adım 1: Tüm aktif ligleri öğren
     ligler_url = "https://www.thesportsdb.com/api/v1/json/1/all_leagues.php"
     bulten = []
     
@@ -26,42 +18,47 @@ def tum_dunya_bultenini_getir():
         r_ligler = requests.get(ligler_url, timeout=5)
         tum_ligler = r_ligler.json().get('leagues', [])
         
-        # 2. ADIM: Sadece Futbol olanları ayıkla ve maçlarını tara
-        # Not: Ücretsiz API hız limiti nedeniyle en popüler ve aktif ilk 50 ligi tarar
-        sayac = 0
+        lig_sayac = 0
         for lig in tum_ligler:
-            if lig['strSport'] == 'Soccer' and sayac < 50:
+            # Sadece futbol liglerini al ve Render'ı kasmamak için en aktif 50 ligle sınırla
+            if lig['strSport'] == 'Soccer' and lig_sayac < 50:
                 lig_id = lig['idLeague']
                 lig_ad = lig['strLeague']
                 
-                # Her ligin sıradaki maçlarını çek
+                # Her ligin 'Oynamayan / Gelecek' maçlarını çek
                 mac_url = f"https://www.thesportsdb.com/api/v1/json/1/eventsnextleague.php?id={lig_id}"
                 try:
                     r_maclar = requests.get(mac_url, timeout=2)
-                    data = r_maclar.json().get('events', [])
-                    if data:
-                        for mac in data:
-                            mac['oranlar'] = oran_uret(mac['idEvent'])
-                            mac['lig_adi'] = lig_ad
-                            bulten.append(mac)
-                        sayac += 1 # Sadece içinde maç olan ligleri say
+                    etkinlikler = r_maclar.json().get('events', [])
+                    if etkinlikler:
+                        for m in etkinlikler:
+                            # Sabit oran üretimi
+                            random.seed(m['idEvent'])
+                            m['oranlar'] = {
+                                "1": round(random.uniform(1.20, 4.00), 2),
+                                "X": round(random.uniform(3.00, 5.00), 2),
+                                "2": round(random.uniform(1.80, 7.00), 2)
+                            }
+                            m['lig_adi'] = lig_ad
+                            bulten.append(m)
+                        lig_sayac += 1
                 except:
                     continue
     except:
         return []
             
-    # Tüm dünyayı tarih sırasına diz
+    # Bülteni tarihe göre sırala
     bulten.sort(key=lambda x: (x.get('dateEvent', ''), x.get('strTime', '')))
     return bulten
 
-# --- ROUTER VE MANTIK ---
+# --- YOLLAR ---
 
 @app.route('/')
 def index():
     if 'bakiye' not in session: session['bakiye'] = 1000
     if 'kuponlar' not in session: session['kuponlar'] = []
     
-    maclar = tum_dunya_bultenini_getir()
+    maclar = bulten_topla()
     return render_template_string(HTML_SABLONU, maclar=maclar, bakiye=session['bakiye'], kuponlar=session['kuponlar'])
 
 @app.route('/oyna', methods=['POST'])
@@ -76,12 +73,12 @@ def oyna():
     session['bakiye'] -= miktar
     session['kuponlar'].insert(0, {
         "mac": mac_adi, "tahmin": tahmin, "oran": oran,
-        "yatirilan": miktar, "tarih": datetime.now().strftime('%H:%M')
+        "yatirilan": miktar, "tarih": datetime.now().strftime('%d.%m %H:%M')
     })
     session.modified = True
     return redirect(url_for('index'))
 
-# --- TASARIM (DEV BÜLTEN) ---
+# --- TASARIM (HATASIZ VE TAM) ---
 
 HTML_SABLONU = """
 <!DOCTYPE html>
@@ -89,62 +86,76 @@ HTML_SABLONU = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Casino 7-24 | Global Dev Bülten</title>
+    <title>Casino 7-24 | Dev Dünya Bülteni</title>
     <style>
-        body { background: #05070a; color: white; font-family: sans-serif; margin: 0; padding: 5px; }
-        .top-nav { background: #11141b; padding: 15px; text-align: center; border-bottom: 2px solid #00ff41; position: sticky; top: 0; z-index: 100; }
-        .bakiye-box { background: #00ff41; color: black; padding: 8px 15px; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 10px; }
-        .lig-ayirici { background: #1c1f26; color: #00ff41; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-top: 15px; display: inline-block; border-left: 3px solid #00ff41; }
-        .mac-kart { background: #12161f; border-radius: 10px; padding: 12px; margin-top: 8px; border: 1px solid #232936; }
-        .takim-text { font-size: 15px; font-weight: bold; display: block; margin-bottom: 10px; }
-        .oran-grid { display: flex; gap: 5px; }
-        .oran-item { flex: 1; background: #232936; border: 1px solid #343a40; padding: 8px; border-radius: 6px; text-align: center; cursor: pointer; }
+        body { background: #05070a; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; }
+        .ust-panel { background: #11141b; padding: 15px; border-radius: 12px; border-bottom: 3px solid #00ff41; position: sticky; top: 0; z-index: 100; text-align: center; }
+        .bakiye { color: #00ff41; font-size: 22px; font-weight: bold; margin-top: 5px; }
+        .lig-ayirici { background: #1c1f26; color: #00ff41; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; margin: 20px 0 10px 0; border-left: 4px solid #00ff41; display: inline-block; }
+        .mac-kart { background: #12161f; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #232936; }
+        .takimlar { font-size: 17px; font-weight: bold; display: block; margin-bottom: 12px; }
+        .oran-container { display: flex; gap: 8px; }
+        .oran-btn { flex: 1; background: #232936; border: 1px solid #343a40; color: white; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .oran-btn:hover { border-color: #00ff41; }
         input[type="radio"] { display: none; }
-        input[type="radio"]:checked + .val { background: #00ff41; color: black; font-weight: bold; border-radius: 3px; padding: 2px; }
-        .alt-bar { display: flex; margin-top: 12px; gap: 5px; }
-        .m-in { background: #000; border: 1px solid #333; color: white; width: 60px; padding: 8px; border-radius: 4px; }
-        .btn-submit { background: #00ff41; color: black; border: none; flex: 1; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        input[type="radio"]:checked + .oran-txt { background: #00ff41; color: black; font-weight: bold; padding: 2px 5px; border-radius: 4px; }
+        .islem-alani { display: flex; gap: 8px; margin-top: 15px; }
+        .m-input { background: #000; border: 1px solid #333; color: white; width: 75px; padding: 10px; border-radius: 6px; }
+        .submit-btn { background: #00ff41; color: black; border: none; flex: 1; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .gecmis { margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; }
+        .kupon { background: #11141b; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #00ff41; font-size: 13px; }
     </style>
 </head>
 <body>
-    <div class="top-nav">
-        <div style="font-size: 18px; font-weight: 800;">CASINO 7-24 GLOBAL</div>
-        <div class="bakiye-box">💰 {{ bakiye }} TL</div>
+    <div class="ust-panel">
+        <div style="font-size: 20px; font-weight: 900;">CASINO 7-24</div>
+        <div class="bakiye">💰 CÜZDAN: {{ bakiye }} TL</div>
     </div>
 
-    {% if not maclar %}
-    <p style="text-align:center; color:#666; margin-top:50px;">Dünya ligleri taranıyor...<br>Lütfen 10 saniye sonra sayfayı yenileyin.</p>
-    {% endif %}
-
     {% for mac in maclar %}
-    <div class="lig-ayirici">{{ mac.lig_adi }}</div>
+    <span class="lig-ayirici">{{ mac.lig_adi }}</span>
     <div class="mac-kart">
-        <div style="font-size: 10px; color: #555;">{{ mac.dateEvent }} | {{ mac.strTime }}</div>
-        <span class="takim-text">{{ mac.strEvent }}</span>
+        <div style="font-size: 11px; color: #666; margin-bottom: 5px;">📅 {{ mac.dateEvent }} | 🕒 {{ mac.strTime }}</div>
+        <span class="takimlar">{{ mac.strEvent }}</span>
         
         <form action="/oyna" method="post">
             <input type="hidden" name="mac_adi" value="{{ mac.strEvent }}">
-            <div class="oran-grid">
-                <label class="oran-item">
+            <div class="oran-container">
+                <label class="oran-btn">
                     <input type="radio" name="tahmin" value="MS 1" required>
-                    <div class="val">1<br>{{ mac.oranlar['1'] }}</div>
+                    <div class="oran-txt">1<br>{{ mac.oranlar['1'] }}</div>
                     <input type="hidden" name="oran" value="{{ mac.oranlar['1'] }}">
                 </label>
-                <label class="oran-item">
+                <label class="oran-btn">
                     <input type="radio" name="tahmin" value="MS X">
-                    <div class="val">X<br>{{ mac.oranlar['X'] }}</div>
+                    <div class="oran-txt">X<br>{{ mac.oranlar['X'] }}</div>
                 </label>
-                <label class="oran-item">
+                <label class="oran-btn">
                     <input type="radio" name="tahmin" value="MS 2">
-                    <div class="val">2<br>{{ mac.oranlar['2'] }}</div>
+                    <div class="oran-txt">2<br>{{ mac.oranlar['2'] }}</div>
                 </label>
             </div>
-            <div class="alt-bar">
-                <input type="number" name="miktar" value="100" class="m-in">
-                <button type="submit" class="btn-submit">Oyna</button>
+            <div class="islem-alani">
+                <input type="number" name="miktar" value="100" class="m-input">
+                <button type="submit" class="submit-btn">BAHİS YAP</button>
             </div>
         </form>
     </div>
     {% endfor %}
+
+    <div class="gecmis">
+        <h4>📋 SON KUPONLARIM</h4>
+        {% for k in kuponlar %}
+        <div class="kupon">
+            <b>{{ k.mac }}</b><br>
+            Tahmin: {{ k.tahmin }} ({{ k.oran }}) | Miktar: {{ k.yatirilan }} TL
+        </div>
+        {% endfor %}
+    </div>
 </body>
 </html>
+"""
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
