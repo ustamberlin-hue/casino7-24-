@@ -5,36 +5,46 @@ from flask import Flask, render_template_string, request, session, redirect, url
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'casino_724_final_stable'
+app.secret_key = 'casino_724_final_stable_v10'
 
-# --- VERİ TARAMA MOTORU (STABİL LİSTE) ---
+# --- 10 KANALLI GERÇEK VERİ MOTORU ---
 def dunya_bultenini_tara():
-    # En hızlı cevap veren ana ligleri seçtik
+    # Tam 10 farklı gerçek lig kanalı
     ligler = {
-        "Süper Lig": "4391", "Premier League": "4328", 
-        "La Liga": "4335", "Serie A": "4332", 
-        "Champions League": "4422"
+        "Süper Lig": "4391", 
+        "Premier League": "4328", 
+        "La Liga": "4335", 
+        "Serie A": "4332", 
+        "Bundesliga": "4331",
+        "Ligue 1": "4334",
+        "Eredivisie": "4337",
+        "Primeira Liga": "4344",
+        "Champions League": "4422",
+        "Europa League": "4423"
     }
+    
     havuz = []
     for lig_ad, lig_id in ligler.items():
+        # Her ligin kendi resmi veri adresine gidiyoruz
         url = f"https://www.thesportsdb.com/api/v1/json/1/eventsnextleague.php?id={lig_id}"
         try:
-            r = requests.get(url, timeout=5)
+            r = requests.get(url, timeout=3) # Hızlı tarama için 3 saniye sınırı
             data = r.json().get('events', [])
             if data:
                 for m in data:
                     random.seed(m['idEvent'])
-                    # Gerçekçi oranlar
+                    # Senin istediğin gerçekçi oran mantığı
                     m['oranlar'] = {
-                        "1": round(random.uniform(1.40, 3.20), 2),
+                        "1": round(random.uniform(1.40, 3.50), 2),
                         "X": round(random.uniform(3.10, 4.20), 2),
                         "2": round(random.uniform(2.10, 5.80), 2)
                     }
                     m['lig_adi'] = lig_ad
                     havuz.append(m)
-        except: continue
+        except: 
+            continue # Bir site o an cevap vermezse bekleme, diğer kanala geç
     
-    # Tarihe göre sıralama
+    # Tüm kanallardan gelen gerçek maçları zamana göre sırala
     havuz.sort(key=lambda x: (x.get('dateEvent', ''), x.get('strTime', '')))
     return havuz
 
@@ -63,14 +73,14 @@ def oyna():
     session.modified = True
     return redirect(url_for('index'))
 
-# --- MODERN VE DOLU TASARIM ---
+# --- SENİN MODERN TASARIMIN ---
 HTML_SABLONU = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CASINO 7-24 | CANLI</title>
+    <title>CASINO 7-24 | 10 KANAL CANLI</title>
     <style>
         body { background: #0b0e14; color: white; font-family: sans-serif; margin: 0; padding: 10px; }
         .header { background: #161b22; padding: 20px; border-radius: 15px; border-bottom: 4px solid #00ff41; text-align: center; margin-bottom: 20px; }
@@ -89,7 +99,7 @@ HTML_SABLONU = """
 
     {% if not maclar %}
     <div style="text-align:center; padding:50px; color:#888;">
-        ⚽ Maçlar yükleniyor... <br>
+        📡 10 Kanaldan Gerçek Maçlar Yükleniyor... <br>
         <small>Lütfen 5 saniye sonra sayfayı yenileyin.</small>
     </div>
     {% endif %}
