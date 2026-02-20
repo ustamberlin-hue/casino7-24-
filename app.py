@@ -5,15 +5,16 @@ from flask import Flask, render_template_string, request, session, redirect, url
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'casino_724_full_access_2026'
+app.secret_key = 'casino_724_ultimate_global_final'
 
-# --- VERİ TARAMA SİSTEMİ ---
+# --- 10+ GLOBAL VERİ KAYNAĞI TARAMA ---
 def dunya_bultenini_tara():
     ligler = {
         "🇹🇷 Süper Lig": "4391", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier Lig": "4328", 
         "🇪🇸 La Liga": "4335", "🇮🇹 Serie A": "4332", 
         "🇩🇪 Bundesliga": "4331", "🇫🇷 Ligue 1": "4334",
-        "🇪🇺 Şampiyonlar Ligi": "4422", "🇪🇺 Avrupa Ligi": "4423"
+        "🇪🇺 Şampiyonlar Ligi": "4422", "🇪🇺 Avrupa Ligi": "4423",
+        "🇳🇱 Eredivisie": "4337", "🇵🇹 Portekiz": "4344"
     }
     havuz = []
     for lig_ad, lig_id in ligler.items():
@@ -50,20 +51,20 @@ def oyna():
     session.modified = True
     return redirect(url_for('index'))
 
-# --- TASARIMIN SONU VE KODUN KAPANIŞI ---
+# --- TASARIM KATMANI ---
 HTML_SABLONU = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CASINO 7-24 | DEV BÜLTEN</title>
+    <title>CASINO 7-24 | GLOBAL BÜLTEN</title>
     <style>
         body { background: #05070a; color: white; font-family: sans-serif; margin: 0; padding: 10px; }
         .header { background: #11141b; padding: 15px; border-radius: 12px; border-bottom: 3px solid #00ff41; text-align: center; margin-bottom: 20px; }
         .bakiye { color: #00ff41; font-size: 22px; font-weight: bold; }
         .mac-kart { background: #12161f; border-radius: 10px; padding: 15px; border: 1px solid #232936; margin-bottom: 15px; }
-        .lig-adi { color: #00ff41; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .lig-adi { color: #00ff41; font-size: 11px; font-weight: bold; }
         .btn-oran { flex: 1; background: #232936; border: 1px solid #343a40; color: white; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; }
         .btn-oyna { background: #00ff41; color: black; border: none; width: 100%; border-radius: 8px; padding: 12px; font-weight: bold; margin-top: 10px; cursor: pointer; }
     </style>
@@ -76,7 +77,7 @@ HTML_SABLONU = """
     {% for mac in maclar %}
     <div class="mac-kart">
         <div class="lig-adi">{{ mac.lig_adi }}</div>
-        <div style="margin: 8px 0; font-weight: bold; font-size: 16px;">{{ mac.strEvent }}</div>
+        <div style="margin: 8px 0; font-weight: bold;">{{ mac.strEvent }}</div>
         <form action="/oyna" method="post">
             <input type="hidden" name="mac_adi" value="{{ mac.strEvent }}">
             <div style="display: flex; gap: 5px;">
@@ -96,5 +97,5 @@ HTML_SABLONU = """
 """
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
