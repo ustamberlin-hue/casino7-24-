@@ -1,65 +1,69 @@
-import requests
+import http.client
+import json
 import os
 import random
 from flask import Flask, render_template_string, session
 
 app = Flask(__name__)
-app.secret_key = 'casino_724_ultra_bulten'
+app.secret_key = 'casino_724_real_live_final'
 
-def ultra_bulten_cek():
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'}
+def gercek_canli_verileri_cek():
+    # Senin verdiğin RapidAPI Key
+    API_KEY = "2b59377c0emsh58c8daff7d6d736p141086jsnb172a65d9ee9"
     
-    # Zorlanmış Veri Havuzu (Tüm açık arşiv linkleri)
-    linkler = [
-        "https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/11/90.json",
-        "https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/43/3.json",
-        "https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/2/44.json",
-        "https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/16/37.json"
-    ]
+    conn = http.client.HTTPSConnection("api-football-v1.p.rapidapi.com")
+    headers = {
+        'x-rapidapi-key': API_KEY,
+        'x-rapidapi-host': "api-football-v1.p.rapidapi.com"
+    }
     
-    toplam_maclar = []
-    lig_listesi = ["Trendyol Süper Lig", "İngiltere Premier Lig", "İspanya La Liga", "Almanya Bundesliga", "İtalya Serie A", "Fransa Ligue 1", "Şampiyonlar Ligi"]
-
-    for url in linkler:
-        try:
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                for m in res.json():
-                    toplam_maclar.append({
-                        "lig": random.choice(lig_listesi),
-                        "ev": m['home_team']['home_team_name'],
-                        "dep": m['away_team']['away_team_name'],
-                        "o1": round(random.uniform(1.20, 5.00), 2),
-                        "ox": round(random.uniform(3.00, 4.50), 2),
-                        "o2": round(random.uniform(1.80, 8.00), 2)
-                    })
-        except: continue
-    
-    # Listeyi karıştır ki her seferinde farklı maçlar üstte gelsin
-    random.shuffle(toplam_maclar)
-    return toplam_maclar
+    try:
+        # ŞU AN OYNANAN TÜM GERÇEK CANLI MAÇLAR
+        conn.request("GET", "/v3/fixtures?live=all", headers=headers)
+        res = conn.getresponse()
+        data = json.loads(res.read().decode("utf-8"))
+        
+        canli_bulten = []
+        for f in data.get("response", []):
+            canli_bulten.append({
+                "lig": f['league']['name'],
+                "ev": f['teams']['home']['name'],
+                "dep": f['teams']['away']['name'],
+                "skor": f"{f['goals']['home']} - {f['goals']['away']}",
+                "dakika": f['fixture']['status']['elapsed'],
+                # API Oranları (Gerçekçi simülasyon)
+                "o1": round(random.uniform(1.40, 4.50), 2),
+                "ox": round(random.uniform(3.10, 4.00), 2),
+                "o2": round(random.uniform(2.10, 6.00), 2)
+            })
+        return canli_bulten
+    except:
+        return []
 
 @app.route('/')
 def index():
     if 'bakiye' not in session: session['bakiye'] = 1000
-    maclar = ultra_bulten_cek()
+    maclar = gercek_canli_verileri_cek()
     return render_template_string(ULTRA_TASARIM, maclar=maclar, bakiye=session['bakiye'])
 
-# --- PROFESYONEL BÜLTEN TASARIMI ---
+# --- SENİN TASARIMIN (CANLI VERİYLE GÜNCELLENDİ) ---
 ULTRA_TASARIM = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CASINO 7-24 | ULTRA BÜLTEN</title>
+    <title>CASINO 7-24 | CANLI BÜLTEN</title>
     <style>
         body { background: #0b0e14; color: white; font-family: 'Inter', sans-serif; margin: 0; padding-bottom: 50px; }
         .ust-panel { background: #161b22; padding: 15px; border-bottom: 2px solid #00ff41; position: sticky; top: 0; z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
+        .live-badge { background: #ff004c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
         .lig-baslik { background: #21262d; padding: 8px 15px; font-size: 13px; color: #00ff41; font-weight: bold; margin-top: 10px; border-left: 4px solid #00ff41; }
         .mac-kart { background: #161b22; margin: 8px; padding: 12px; border-radius: 8px; border: 1px solid #30363d; }
+        .skor-kutusu { background: #0d1117; padding: 5px 15px; border-radius: 5px; color: #00ff41; font-weight: bold; font-size: 18px; }
         .oran-sirasi { display: flex; gap: 5px; margin-top: 10px; }
-        .oran-kutusu { flex: 1; background: #0d1117; border: 1px solid #30363d; padding: 8px; text-align: center; border-radius: 4px; }
+        .oran-kutusu { flex: 1; background: #0d1117; border: 1px solid #30363d; padding: 8px; text-align: center; border-radius: 4px; cursor: pointer; }
         .bakiye-badge { background: #00ff41; color: black; padding: 4px 12px; border-radius: 15px; font-weight: bold; }
     </style>
 </head>
@@ -70,16 +74,16 @@ ULTRA_TASARIM = """
     </div>
 
     <div style="padding: 10px; text-align: center; color: #8b949e; font-size: 12px;">
-        GÜNCEL FUTBOL BÜLTENİ ({{ maclar|length }} MAÇ AKTİF)
+        🔴 CANLI GERÇEK MAÇLAR ({{ maclar|length }} MAÇ ŞU AN OYNANIYOR)
     </div>
 
     {% for m in maclar %}
-    <div class="lig-baslik">{{ m.lig }}</div>
+    <div class="lig-baslik">{{ m.lig }} <span class="live-badge">{{ m.dakika }}'</span></div>
     <div class="mac-kart">
-        <div style="display: flex; justify-content: space-between; font-weight: 500;">
-            <span>{{ m.ev }}</span>
-            <span style="color: #8b949e;">-</span>
-            <span>{{ m.dep }}</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 500;">
+            <span style="flex:1; text-align:right; padding-right:10px;">{{ m.ev }}</span>
+            <span class="skor-kutusu">{{ m.skor }}</span>
+            <span style="flex:1; text-align:left; padding-left:10px;">{{ m.dep }}</span>
         </div>
         <div class="oran-sirasi">
             <div class="oran-kutusu"><small style="color:#8b949e">1</small><br>{{ m.o1 }}</div>
@@ -88,6 +92,10 @@ ULTRA_TASARIM = """
         </div>
     </div>
     {% endfor %}
+    
+    {% if not maclar %}
+    <div style="text-align:center; padding:50px; color:#8b949e;">Şu an canlı maç bulunamadı.</div>
+    {% endif %}
 </body>
 </html>
 """
