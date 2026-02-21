@@ -1,42 +1,28 @@
 import streamlit as st
-import time
 
-st.set_page_config(page_title="Sanal Namaz Hocası", page_icon="🕌")
+st.set_page_config(page_title="Sanal Namaz Hocası", page_icon="🕌", layout="centered")
 
-st.title("🕌 5 Vakit Sanal Namaz Hocası")
-st.write("Vakti seçin ve Hocayı takip edin. (Gerçek Video Yükleniyor...)")
+st.title("🕌 Sanal Namaz Hocası")
+st.write("Vakti seçin ve Hocayı tam ekran izleyerek namazınızı kılın.")
 
 # 5 Vakit Seçimi
-vakit = st.selectbox("Namaz Vakti:", ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
+vakit = st.selectbox("Namaz Vakti Seçin:", ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
 
-# GERÇEK HOCA VİDEO LİNKİ (Tavşan değil, gerçek eğitim videosu)
-# İnternet hızına göre yüklenmesi birkaç saniye sürebilir.
-GERCEK_HOCA = "https://ia800605.us.archive.org/15/items/NamazNasilKiliniz/NamazNasilKilinir.mp4"
-GERCEK_SES = "https://www.namazzamani.net/sesli/fatiha.mp3"
+# GERÇEK NAMAZ EĞİTİM VİDEOLARI (Her vakit için ayrı tam video)
+# Bu videolar niyetten selama kadar her şeyi içerir.
+namaz_videolari = {
+    "Sabah": "https://www.youtube.com/watch?v=kYv_86t06tI",
+    "Öğle": "https://www.youtube.com/watch?v=S-t14Xunp80",
+    "İkindi": "https://www.youtube.com/watch?v=9S_9xI9-6vU",
+    "Akşam": "https://www.youtube.com/watch?v=7uK3F8LgUf8",
+    "Yatsı": "https://www.youtube.com/watch?v=n-W2m-tX6yM"
+}
 
 if st.button(f"{vakit} Namazını Başlat"):
-    st.success(f"{vakit} namazı rehberliği başlıyor. Allah kabul etsin.")
+    st.success(f"{vakit} namazı rehberliği yüklendi. Lütfen hocayı takip edin.")
     
-    # Namazın Tüm Aşamaları (Eksiksiz)
-    akis = [
-        "Niyet ve Tekbir", "Kıyam (Okuma)", "Rüku", 
-        "Secde 1", "Secde 2", "Tahiyyat (Oturuş)", "Selam"
-    ]
+    # YouTube videosunu doğrudan gömüyoruz (Bu yöntem siyah ekran sorununu çözer)
+    st.video(namaz_videolari[vakit])
     
-    for adim in akis:
-        st.subheader(f"📍 Şu an: {adim}")
-        
-        # Gerçek Namaz Videosu
-        st.video(GERCEK_HOCA)
-        
-        # Hoca Sesi
-        st.audio(GERCEK_SES, autoplay=True)
-        
-        st.info(f"Lütfen hoca ile birlikte {adim} aşamasını yapın.")
-        
-        # Bir sonraki harekete geçmeden önce bekleme
-        time.sleep(12) 
-        st.divider()
-
+    st.info("💡 İpucu: Videoyu tam ekran yapıp sesini açarak seccadenin önüne koyabilirsiniz.")
     st.balloons()
-    st.success("Namaz tamamlandı!")
