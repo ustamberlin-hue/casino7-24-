@@ -1,8 +1,8 @@
 import streamlit as st
 
-st.set_page_config(page_title="Pro Simülasyon", layout="wide")
+st.set_page_config(page_title="Hızlı Şoför Pro", layout="wide")
 
-# Ekranı temizleyen CSS
+# Sayfa stilini ve tam ekran ayarını yapıyoruz
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { overflow: hidden; height: 100vh; background: #222; }
@@ -11,7 +11,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Hata vermemesi için tırnaklara dikkat ederek HTML kodunu ekliyoruz
+# Kesin çalışan, tırnak hatası giderilmiş HTML/JS bloğu
 oyun_html = """
 <!DOCTYPE html>
 <html>
@@ -21,9 +21,9 @@ oyun_html = """
         body { margin: 0; overflow: hidden; background: #333; font-family: sans-serif; }
         canvas { display: block; touch-action: none; background: #444; }
         #hud {
-            position: absolute; top: 10px; width: 100%; display: flex;
+            position: absolute; top: 15px; width: 100%; display: flex;
             justify-content: space-around; color: white; font-size: 20px;
-            text-shadow: 2px 2px 4px #000; pointer-events: none;
+            font-weight: bold; text-shadow: 2px 2px 4px #000; pointer-events: none;
         }
     </style>
 </head>
@@ -48,8 +48,8 @@ oyun_html = """
     let roadOffset = 0;
     let gameActive = true;
 
-    // Aracı ekranın biraz yukarısına aldık ki parmak altında kalarak kaybolmasın
-    const player = { x: canvas.width / 2 - 30, y: canvas.height - 200, w: 60, h: 90 };
+    // Kendi aracını (🏎️) ekranın daha yukarısına aldık (y: -250)
+    const player = { x: canvas.width / 2 - 30, y: canvas.height - 250, w: 60, h: 100 };
     let traffic = [];
     let hearts = [];
 
@@ -62,7 +62,7 @@ oyun_html = """
 
     function spawnTraffic() {
         if (gameActive && Math.random() < 0.03) {
-            traffic.push({ x: Math.random() * (canvas.width - 60), y: -100, speed: 5 + (score/20) });
+            traffic.push({ x: Math.random() * (canvas.width - 60), y: -120, speed: 5 + (score/50) });
         }
     }
 
@@ -78,7 +78,7 @@ oyun_html = """
 
         // Yol ve Hareketli Çizgiler
         roadOffset += 10;
-        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
         ctx.setLineDash([40, 40]);
         ctx.lineDashOffset = -roadOffset;
         ctx.lineWidth = 6;
@@ -86,21 +86,21 @@ oyun_html = """
         ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height);
         ctx.stroke();
 
-        // Kendi Aracın (Dik ve Düzgün)
-        ctx.font = "70px Arial";
+        // KENDİ ARACIN: Dik ve düzgün (🏎️)
+        ctx.font = "80px Arial";
         ctx.save();
         ctx.translate(player.x + player.w/2, player.y + player.h/2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText("🏎️", -35, 25);
+        ctx.rotate(-Math.PI / 2); // Dik konuma getir
+        ctx.fillText("🏎️", -40, 30);
         ctx.restore();
 
-        // Diğer Araçlar
+        // DİĞER ARABALAR: Onları da dik yaptık (🚘)
         traffic.forEach((car, i) => {
             car.y += car.speed;
             ctx.save();
-            ctx.translate(car.x + 30, car.y + 45);
-            ctx.rotate(Math.PI / 2);
-            ctx.fillText("🚘", -35, 25);
+            ctx.translate(car.x + 30, car.y + 50);
+            ctx.rotate(Math.PI / 2); // Karşıdan gelenleri dik yaptık
+            ctx.fillText("🚘", -40, 30);
             ctx.restore();
 
             // Çarpışma Kontrolü
@@ -113,11 +113,12 @@ oyun_html = """
             if (car.y > canvas.height) { traffic.splice(i, 1); score += 10; scoreEl.innerText = score; }
         });
 
-        // Can Toplama (❤️)
+        // Canlar (❤️)
         hearts.forEach((h, i) => {
             h.y += 5;
+            ctx.font = "40px Arial";
             ctx.fillText("❤️", h.x, h.y + 40);
-            if (player.x < h.x + 40 && player.x + 60 > h.x && player.y < h.y + 40 && player.y + 90 > h.y) {
+            if (player.x < h.x + 40 && player.x + 60 > h.x && player.y < h.y + 40 && player.y + 100 > h.y) {
                 hearts.splice(i, 1);
                 lives++;
                 livesEl.innerText = lives;
@@ -134,4 +135,4 @@ oyun_html = """
 </html>
 """
 
-st.components.v1.html(oyun_html, height=1000)
+st.components.v1.html(oyun_html, height=1200)
