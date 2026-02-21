@@ -1,96 +1,98 @@
 import streamlit as st
 import time
 
-st.set_page_config(page_title="Sanal İmam", page_icon="🕌")
+st.set_page_config(page_title="Namaz Rehberi", page_icon="🕌")
 
-def imam_seslendir(metin):
-    # pitch: 0.4 ve rate: 0.7 ile camideki hocaların o meşhur tok ve ağır sesini simüle eder.
+def hoca_seslendir(metin):
+    # pitch: 1.1 (Kadın sesi), rate: 0.7 (Ağır ve vurgulu hoca edası)
     html_kodu = f"""
     <script>
         window.speechSynthesis.cancel();
         var msg = new SpeechSynthesisUtterance('{metin}');
         msg.lang = 'tr-TR';
         msg.rate = 0.7; 
-        msg.pitch = 0.4; 
+        msg.pitch = 1.1; 
         window.speechSynthesis.speak(msg);
     </script>
     """
     st.components.v1.html(html_kodu, height=0)
 
-st.title("🕌 Sanal İmam Namaz Hocası")
-st.info("İmamın 'Allâhu Ekber' komutlarını duyduğunuzda hareket edin. Telefonu seccadenin önüne koyun.")
+st.title("🕌 Namaz Rehberi (Vurgulu Ses)")
+st.write("Ekranda yazan 'KONUM' bilgisini takip ederek hareket edin.")
 
 vakit = st.selectbox("Vakit Seçin:", ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
 
-# TÜM DUALAR VE SURELER (Eksiksiz)
+# ARAPÇA VURGULU OKUNUŞLAR
 dualar = {
-    "Niyet": "Niyet ettim Allah rızası için bugünkü namazı kılmaya.",
-    "Tekbir": "Allâhu Ekber",
-    "Subhaneke": "Sübhânekellâhümme ve bi hamdik ve tebârakesmük ve teâlâ ceddük ve lâ ilâhe ğayrük.",
-    "Fatiha": "Elhamdülillâhi rabbilâlemîn. Errahmânirrahîm. Mâliki yevmiddîn. İyyâke na'büdü ve iyyâke nestaîn. İhdinassırâtel müstakîm. Sırâtallezîne en'amte aleyhim ğayrilmağdûbi aleyhim veleddâllîn. Âmîn.",
-    "Sure1": "Bismillâhirrahmânirrahîm. Kul hüvallahü ehad. Allahüssamed. Lem yelid ve lem yüled. Ve lem yekün lehü küfüven ehad.",
-    "Sure2": "Bismillâhirrahmânirrahîm. İnna a'taynakel kevser. Fesalli lirabbike venhar. İnne şânieke hüvel ebter.",
-    "Ruku_Tesbih": "Sübhâne rabbiyel azîm. Sübhâne rabbiyel azîm. Sübhâne rabbiyel azîm.",
-    "Kavme": "Semi Allâhu limen hamideh. Rabbenâ lekel hamd.",
-    "Secde_Tesbih": "Sübhâne rabbiyel alâ. Sübhâne rabbiyel alâ. Sübhâne rabbiyel alâ.",
-    "Tahiyyat": "Ettehiyyâtü lillâhi vessalevâtü vettayyibât. Esselâmü aleyke eyyühen-nebiyyü ve rahmetüllâhi ve berekâtüh. Esselâmü aleynâ ve alâ ibâdillâhis-salihîn. Eşhedü en lâ ilâhe illallâh ve eşhedü enne Muhammeden abdühû ve rasûlüh.",
-    "SalliBarik": "Allahümme salli ala Muhammed. Allahümme barik ala Muhammed.",
-    "Rabbena": "Rabbena atina fiddünya haseneten ve fil ahireti haseneten ve kına azabennar.",
-    "Selam": "Esselâmü aleyküm ve rahmetullâh."
+    "Niyet": "Niyet ettim Allah rızası için namaz kılmaya.",
+    "Tekbir": "Allâââhu Ekber",
+    "Subhaneke": "Sübhâânekellââ hümme ve bi hamdik. Ve tebââ rakesmük. Ve teââ lâ ceddük. Ve lââ ilââhe ğayrük.",
+    "Fatiha": "Elhamdülillââhi rabbil ââlemîîn. Errahmâânirrahîîm. Mââliki yevmiddîîn. İyyââke na'büdü ve iyyââke nestaîîn. İhdinassırââtel müstakîîm. Sırââtallezîîne en'amte aleyhim. Ğayril mağdûûbi aleyhim veleddââllîîn. Âââmîîn.",
+    "Sure1": "Bismillââhir rahmâânir rahîîm. Kul hüvallââhu ehad. Allââhüs samed. Lem yelid ve lem yüüled. Ve lem yekün lehüü küfüven ehad.",
+    "Ruku_Tesbih": "Sübhââne rabbiyel azîîm. Sübhââne rabbiyel azîîm. Sübhââne rabbiyel azîîm.",
+    "Kavme": "Semi Allââhu limen hamideh. Rabbenââ lekel hamd.",
+    "Secde_Tesbih": "Sübhââne rabbiyel alââ. Sübhââne rabbiyel alââ. Sübhâne rabbiyel alââ.",
+    "Tahiyyat": "Ettehiyyââtü lillââhi vessalevââtü vettayyibâât. Esselââmu aleyke eyyühen nebiyyü ve rahmetüllââhi ve berekââtüh. Esselââmu aleynââ ve alââ ibââdillâhis sââlihîîn. Eşhedü en lââ ilââhe illallââh. Ve eşhedü enne Muhammeden abdühüü ve rasûûlüh.",
+    "SalliBarik": "Allââhümme salli alââ Muhammed. Allââhümme bâârik alââ Muhammed.",
+    "Rabbena": "Rabbenââ ââti nââ fiddünyââ haseneten ve fil ââhireti haseneten ve kınââ azââ bennââr.",
+    "Selam": "Esselââmu aleyküm ve rahmetullââhh."
 }
 
-if st.button(f"{vakit} Namazını Başlat"):
-    rekat_sayisi = {"Sabah": 2, "Öğle": 4, "İkindi": 4, "Akşam": 3, "Yatsı": 4}[vakit]
+if st.button("Namazı Başlat"):
+    rekatlar = {"Sabah": 2, "Öğle": 4, "İkindi": 4, "Akşam": 3, "Yatsı": 4}[vakit]
     
-    for r in range(1, rekat_sayisi + 1):
-        st.subheader(f"📿 {r}. Rekat")
+    for r in range(1, rekatlar + 1):
+        # KONUM GÖSTERGESİ
+        st.markdown(f"## 📍 KONUM: {r}. Rekat - AYAKTA (Kıyam)")
         
-        # Başlangıç
         if r == 1:
-            imam_seslendir(dualar["Niyet"])
+            hoca_seslendir(dualar["Niyet"])
             time.sleep(5)
-            imam_seslendir(dualar["Tekbir"])
+            hoca_seslendir(dualar["Tekbir"])
             time.sleep(3)
-            imam_seslendir(dualar["Subhaneke"])
-            time.sleep(7)
+            hoca_seslendir(dualar["Subhaneke"])
+            time.sleep(8)
 
-        # Kıyam (Okuma)
-        imam_seslendir(dualar["Fatiha"])
-        time.sleep(18)
-        zamm_i_sure = dualar["Sure1"] if r % 2 != 0 else dualar["Sure2"]
-        imam_seslendir(zamm_i_sure)
+        hoca_seslendir(dualar["Fatiha"])
+        time.sleep(20)
+        hoca_seslendir(dualar["Sure1"])
         time.sleep(12)
 
-        # RÜKÛ VE KAVME
-        imam_seslendir(dualar["Tekbir"]) # Rükuya eğilirken
+        # RÜKÛ KONUMU
+        st.markdown("## 📍 KONUM: RÜKÛ")
+        hoca_seslendir(dualar["Tekbir"])
         time.sleep(2)
-        imam_seslendir(dualar["Ruku_Tesbih"])
-        time.sleep(8)
-        imam_seslendir(dualar["Kavme"]) # Rükudan doğrulurken (Kavme)
-        time.sleep(5)
+        hoca_seslendir(dualar["Ruku_Tesbih"])
+        time.sleep(10)
 
-        # SECDELER
+        # DOĞRULMA (KAVME) KONUMU
+        st.markdown("## 📍 KONUM: DOĞRUL (Kavme)")
+        hoca_seslendir(dualar["Kavme"])
+        time.sleep(6)
+
+        # SECDE KONUMU
         for s in range(1, 3):
-            imam_seslendir(dualar["Tekbir"]) # Secdeye giderken
+            st.markdown(f"## 📍 KONUM: {s}. SECDE")
+            hoca_seslendir(dualar["Tekbir"])
             time.sleep(2)
-            imam_seslendir(dualar["Secde_Tesbih"])
-            time.sleep(10)
-            imam_seslendir(dualar["Tekbir"]) # Secdeden kalkarken
-            time.sleep(3)
-
-        # OTURUŞLAR
-        if r == 2 or r == rekat_sayisi:
-            st.write("📌 Oturuş duaları...")
-            imam_seslendir(dualar["Tahiyyat"])
+            hoca_seslendir(dualar["Secde_Tesbih"])
             time.sleep(12)
-            if r == rekat_sayisi:
-                imam_seslendir(dualar["SalliBarik"])
+            hoca_seslendir(dualar["Tekbir"]) # Kalkış
+            time.sleep(4)
+
+        # OTURUŞ KONUMU
+        if r == 2 or r == rekatlar:
+            st.markdown("## 📍 KONUM: OTURUŞ (Kade)")
+            hoca_seslendir(dualar["Tahiyyat"])
+            time.sleep(15)
+            if r == rekatlar:
+                hoca_seslendir(dualar["SalliBarik"])
+                time.sleep(15)
+                hoca_seslendir(dualar["Rabbena"])
                 time.sleep(12)
-                imam_seslendir(dualar["Rabbena"])
-                time.sleep(10)
-                # Selamlar
-                imam_seslendir(dualar["Selam"])
-                time.sleep(4)
-                imam_seslendir(dualar["Selam"])
+                st.markdown("## 📍 KONUM: SELAM")
+                hoca_seslendir(dualar["Selam"])
+                time.sleep(5)
+                hoca_seslendir(dualar["Selam"])
                 st.success("Namaz bitti. Allah kabul etsin.")
     st.balloons()
