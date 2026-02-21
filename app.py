@@ -1,98 +1,128 @@
 import streamlit as st
 
-st.set_page_config(page_title="Hızlı Şoför", page_icon="🏎️")
+st.set_page_config(page_title="Pro Şoför", page_icon="🏎️", layout="wide")
 
-st.title("🏎️ Trafik Canavarı: Kaçış")
-st.write("Ekrana dokunarak veya ok tuşlarıyla arabayı yönlendir. Diğer araçlara çarpma!")
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stApp {margin: 0; padding: 0;}
+    iframe {width: 100vw; height: 90vh; border: none;}
+    </style>
+    """, unsafe_allow_html=True)
 
-# Oyunun JavaScript ve HTML motoru
 oyun_html = """
-<div id="game-container" style="text-align:center;">
-    <canvas id="gameCanvas" width="300" height="400" style="border:5px solid #333; background:#555; touch-action:none;"></canvas>
-    <div style="margin-top:10px;">
-        <button onclick="moveLeft()" style="padding:15px; font-size:20px;">⬅️ Sol</button>
-        <button onclick="moveRight()" style="padding:15px; font-size:20px;">Sağ ➡️</button>
+<div id="game-wrapper" style="width: 100%; height: 100vh; background: #333; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
+    <div style="color: white; padding: 10px; font-family: sans-serif; display: flex; gap: 20px; font-size: 20px;">
+        <span>🏆 Skor: <b id="score">0</b></span>
+        <span>❤️ Can: <b id="lives">3</b></span>
     </div>
-    <h2 id="scoreBoard">Skor: 0</h2>
+    <canvas id="road" style="background: #444; border-left: 5px solid white; border-right: 5px solid white; touch-action: none;"></canvas>
+    
+    <div style="position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around;">
+        <button id="leftBtn" style="width: 120px; height: 80px; font-size: 30px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: white;">⬅️</button>
+        <button id="rightBtn" style="width: 120px; height: 80px; font-size: 30px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: white;">➡️</button>
+    </div>
 </div>
 
 <script>
-    const canvas = document.getElementById("gameCanvas");
+    const canvas = document.getElementById("road");
     const ctx = canvas.getContext("2d");
-    const scoreBoard = document.getElementById("scoreBoard");
+    const scoreEl = document.getElementById("score");
+    const livesEl = document.getElementById("lives");
 
-    let player = { x: 125, y: 330, w: 50, h: 60, color: "red" };
-    let enemies = [];
+    // Ekran boyutuna göre ayarla
+    canvas.width = window.innerWidth > 500 ? 400 : window.innerWidth - 40;
+    canvas.height = window.innerHeight * 0.7;
+
     let score = 0;
+    let lives = 3;
     let gameActive = true;
+    let roadOffset = 0;
 
-    function drawPlayer() {
-        ctx.fillStyle = player.color;
-        ctx.fillRect(player.x, player.y, player.w, player.h);
-        // Farlar
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(player.x + 5, player.y, 10, 5);
-        ctx.fillRect(player.x + 35, player.y, 10, 5);
-    }
+    // Görseller (Emoji kullanarak gerçekçi araç hissi)
+    const playerImg = "🏎️";
+    const enemyImg = "🚘";
+    const lifeImg = "❤️";
 
-    function createEnemy() {
-        if (Math.random() < 0.02) {
-            enemies.push({ x: Math.random() * 250, y: -50, w: 50, h: 60, speed: 3 + (score/10) });
+    let player = { x: canvas.width / 2 - 25, y: canvas.height - 100, w: 50, h: 80 };
+    let enemies = [];
+    let powerups = [];
+
+    function spawnEnemy() {
+        if (gameActive && Math.random() < 0.02) {
+            enemies.push({ x: Math.random() * (canvas.width - 50), y: -100, w: 50, h: 80, speed: 4 });
         }
     }
 
-    function drawEnemies() {
-        ctx.fillStyle = "blue";
-        enemies.forEach((en, index) => {
-            ctx.fillRect(en.x, en.y, en.w, en.h);
-            en.y += en.speed;
-
-            // Çarpışma Kontrolü
-            if (player.x < en.x + en.w && player.x + player.w > en.x &&
-                player.y < en.y + en.h && player.y + player.h > en.y) {
-                gameActive = false;
-                alert("KAZA YAPTIN! Skorun: " + score);
-                document.location.reload();
-            }
-
-            if (en.y > 400) {
-                enemies.splice(index, 1);
-                score++;
-                scoreBoard.innerHTML = "Skor: " + score;
-            }
-        });
+    function spawnPowerup() {
+        if (gameActive && Math.random() < 0.005) {
+            powerups.push({ x: Math.random() * (canvas.width - 30), y: -50, w: 30, h: 30, speed: 3 });
+        }
     }
-
-    function moveLeft() { if (player.x > 0) player.x -= 25; }
-    function moveRight() { if (player.x < 250) player.x += 25; }
-
-    // Klavye Desteği
-    window.addEventListener("keydown", e => {
-        if (e.key === "ArrowLeft") moveLeft();
-        if (e.key === "ArrowRight") moveRight();
-    });
 
     function update() {
         if (!gameActive) return;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Yol çizgileri
+        // Yol Çizgileri
+        roadOffset += 5;
         ctx.strokeStyle = "white";
-        ctx.setLineDash([20, 20]);
+        ctx.setLineDash([30, 30]);
+        ctx.lineDashOffset = -roadOffset;
         ctx.beginPath();
-        ctx.moveTo(150, 0); ctx.lineTo(150, 400);
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
         ctx.stroke();
 
-        drawPlayer();
-        createEnemy();
-        drawEnemies();
+        // Oyuncu Çizimi
+        ctx.font = "60px Arial";
+        ctx.fillText(playerImg, player.x, player.y + 60);
+
+        // Düşman Arabalar
+        enemies.forEach((en, i) => {
+            ctx.fillText(enemyImg, en.x, en.y + 60);
+            en.y += en.speed;
+
+            // Çarpışma (Can Azalma)
+            if (player.x < en.x + en.w && player.x + player.w > en.x && player.y < en.y + en.h && player.y + player.h > en.y) {
+                enemies.splice(i, 1);
+                lives--;
+                livesEl.innerText = lives;
+                if (lives <= 0) {
+                    gameActive = false;
+                    alert("OYUN BİTTİ! Skor: " + score);
+                    location.reload();
+                }
+            }
+            if (en.y > canvas.height) { enemies.splice(i, 1); score++; scoreEl.innerText = score; }
+        });
+
+        // Can Toplama
+        powerups.forEach((p, i) => {
+            ctx.font = "30px Arial";
+            ctx.fillText(lifeImg, p.x, p.y + 30);
+            p.y += p.speed;
+            if (player.x < p.x + p.w && player.x + player.w > p.x && player.y < p.y + p.h && player.y + player.h > p.y) {
+                powerups.splice(i, 1);
+                lives++;
+                livesEl.innerText = lives;
+            }
+        });
+
+        spawnEnemy();
+        spawnPowerup();
         requestAnimationFrame(update);
     }
+
+    // Kontroller
+    document.getElementById("leftBtn").onclick = () => { if (player.x > 10) player.x -= 40; };
+    document.getElementById("rightBtn").onclick = () => { if (player.x < canvas.width - 60) player.x += 40; };
+    
     update();
 </script>
 """
 
-st.components.v1.html(oyun_html, height=600)
-
-st.divider()
-st.info("💡 **Tüyo:** Skorun arttıkça karşıdan gelen arabalar hızlanacak! Gözünü yoldan ayırma.")
+st.components.v1.html(oyun_html, height=800)
