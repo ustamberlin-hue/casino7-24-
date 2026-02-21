@@ -1,63 +1,69 @@
 import streamlit as st
 
-st.set_page_config(page_title="Manken Giydirme", page_icon="💃", layout="wide")
+st.set_page_config(page_title="Gerçek Bebek Giydirme", page_icon="🧸", layout="centered")
 
-st.title("💃 Profesyonel Manken Giydirme")
-st.write("Kıyafetleri mankenin üzerine sürükle ve kendi stilini yarat!")
+# CSS ile Görselliği Güzelleştirme
+st.markdown("""
+    <style>
+    .main { background-color: #fff5f8; }
+    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #ffb6c1; color: white; border: none; }
+    .stButton>button:hover { background-color: #ff69b4; color: white; }
+    .bebek-container { position: relative; width: 300px; height: 450px; margin: auto; background: white; border-radius: 20px; border: 5px solid #ffb6c1; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    .katman { position: absolute; width: 250px; transition: all 0.3s; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# HTML ve JavaScript ile Sürükle-Bırak Sistemi
-drag_drop_html = """
-<style>
-    .game-container { display: flex; gap: 50px; justify-content: center; background: #f9f9f9; padding: 20px; border-radius: 15px; }
-    .wardrobe { width: 200px; border: 2px dashed #ccc; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-    .model-area { position: relative; width: 300px; height: 500px; border: 2px solid #333; background: #fff url('https://cdn-icons-png.flaticon.com/512/65/65581.png') no-repeat center; background-size: contain; }
-    .item { width: 80px; cursor: move; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
-    .dropped-item { position: absolute; cursor: move; }
-</style>
+st.title("🎀 Benim Tatlı Bebeğim")
+st.write("Aşağıdaki gardıroptan kıyafet seç, bebeğin üzerinde görsün!")
 
-<div class="game-container">
-    <div class="wardrobe" id="wardrobe" ondrop="drop(event)" ondragover="allowDrop(event)">
-        <h3>Gardırop</h3>
-        <img id="dress1" src="https://cdn-icons-png.flaticon.com/512/2357/2357127.png" draggable="true" ondragstart="drag(event)" class="item" alt="Elbise">
-        <img id="hat1" src="https://cdn-icons-png.flaticon.com/512/1039/1039755.png" draggable="true" ondragstart="drag(event)" class="item" alt="Şapka">
-        <img id="shoes1" src="https://cdn-icons-png.flaticon.com/512/2872/2872620.png" draggable="true" ondragstart="drag(event)" class="item" alt="Ayakkabı">
+# --- DURUM YÖNETİMİ ---
+if 'ust_resim' not in st.session_state: st.session_state.ust_resim = ""
+if 'alt_resim' not in st.session_state: st.session_state.alt_resim = ""
+if 'aksesuar_resim' not in st.session_state: st.session_state.aksesuar_resim = ""
+
+# --- OYUN ALANI ---
+col1, col2 = st.columns([1.2, 1])
+
+with col1:
+    st.subheader("👶 Manken")
+    
+    # Gerçek Bebek ve Kıyafet Katmanları (Emoji ve Görsel Temsili)
+    # Not: Gerçek PNG linkleri eklenerek daha da güzelleştirilebilir.
+    bebek_html = f"""
+    <div class="bebek-container">
+        <img src="https://cdn-icons-png.flaticon.com/512/3069/3069172.png" class="katman" style="z-index: 1;"> <div style="position: absolute; z-index: 5; font-size: 80px; top: 180px;">{st.session_state.ust_resim}</div>
+        <div style="position: absolute; z-index: 4; font-size: 80px; top: 250px;">{st.session_state.alt_resim}</div>
+        <div style="position: absolute; z-index: 6; font-size: 60px; top: 60px;">{st.session_state.aksesuar_resim}</div>
     </div>
+    """
+    st.components.v1.html(bebek_html, height=460)
 
-    <div class="model-area" id="model" ondrop="drop(event)" ondragover="allowDrop(event)">
-        <h3 style="text-align:center; color: #888;">Manken</h3>
-    </div>
-</div>
+with col2:
+    st.subheader("👗 Gardırop")
+    
+    with st.expander("👕 Üstler", expanded=True):
+        u1, u2 = st.columns(2)
+        if u1.button("💖 Pembe"): st.session_state.ust_resim = "👚"
+        if u2.button("💙 Mavi"): st.session_state.ust_resim = "👕"
+        if u1.button("🐥 Ördek"): st.session_state.ust_resim = "🐤"
+        if u2.button("🦁 Aslan"): st.session_state.ust_resim = "🦁"
 
-<script>
-    function allowDrop(ev) {
-        ev.preventDefault();
-    }
+    with st.expander("👖 Altlar"):
+        a1, a2 = st.columns(2)
+        if a1.button("👖 Kot"): st.session_state.alt_resim = "👖"
+        if a2.button("👗 Etek"): st.session_state.alt_resim = "👗"
+        if a1.button("🩳 Şort"): st.session_state.alt_resim = "🩳"
+        if a2.button("🌸 Çiçekli"): st.session_state.alt_resim = "🌺"
 
-    function drag(ev) {
-        ev.dataTransfer.setData("text", ev.target.id);
-    }
+    with st.expander("🎩 Aksesuar"):
+        ak1, ak2 = st.columns(2)
+        if ak1.button("👑 Taç"): st.session_state.aksesuar_resim = "👑"
+        if ak2.button("👒 Şapka"): st.session_state.aksesuar_resim = "👒"
+        if ak1.button("🕶️ Gözlük"): st.session_state.aksesuar_resim = "🕶️"
+        if ak2.button("🎀 Toka"): st.session_state.aksesuar_resim = "🎀"
 
-    function drop(ev) {
-        ev.preventDefault();
-        var data = ev.dataTransfer.getData("text");
-        var draggedElement = document.getElementById(data);
-        
-        // Eğer mankenin üzerine bırakılırsa pozisyonu ayarla
-        if (ev.target.id === "model") {
-            ev.target.appendChild(draggedElement);
-            draggedElement.style.position = "absolute";
-            draggedElement.style.left = (ev.offsetX - 40) + "px";
-            draggedElement.style.top = (ev.offsetY - 20) + "px";
-        } else if (ev.target.id === "wardrobe") {
-            ev.target.appendChild(draggedElement);
-            draggedElement.style.position = "static";
-        }
-    }
-</script>
-"""
-
-# HTML kodunu Streamlit'e bas
-st.components.v1.html(drag_drop_html, height=600)
-
-st.divider()
-st.info("💡 **Nasıl Oynanır?** Soldaki kıyafetleri farenle tut, mankenin üzerine istediğin yere bırak. Beğenmezsen geri gardıroba sürükle!")
+if st.button("♻️ Bebeği Soy / Sıfırla"):
+    st.session_state.ust_resim = ""
+    st.session_state.alt_resim = ""
+    st.session_state.aksesuar_resim = ""
+    st.rerun()
