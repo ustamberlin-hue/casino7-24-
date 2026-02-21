@@ -1,42 +1,53 @@
 import streamlit as st
 import time
 
-# Sayfa Yapılandırması
+# Sayfa tasarımı
 st.set_page_config(page_title="Sanal Namaz Hocası", page_icon="🕌", layout="wide")
 
 st.title("🕌 5 Vakit Sanal Namaz Hocası")
-st.write("Telefonu sabitleyin, sesini açın ve Hocayı takip edin.")
+st.write("Vakti seçin, 'Namazı Başlat' butonuna basın ve Hocayı takip edin.")
 
 # 5 Vakit Seçimi
-vakit = st.sidebar.selectbox("Kılmak istediğiniz namazı seçin:", 
+vakit = st.selectbox("Kılmak istediğiniz namazı seçin:", 
                      ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
 
-# --- MEDYA HAVUZU (Hoca Buradan Besleniyor) ---
-# Buradaki linkler internetteki hazır namaz eğitim videolarından çekilir.
-MEDYA = {
-    "Kıyam": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
-    "Rüku": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
-    "Secde": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"}
+# Namazların Rekat Yapısı
+rekatlar = {
+    "Sabah": ["Sünnet (2 rekat)", "Farz (2 rekat)"],
+    "Öğle": ["İlk Sünnet (4)", "Farz (4)", "Son Sünnet (2)"],
+    "İkindi": ["Sünnet (4)", "Farz (4)"],
+    "Akşam": ["Farz (3)", "Sünnet (2)"],
+    "Yatsı": ["İlk Sünnet (4)", "Farz (4)", "Son Sünnet (2)", "Vitir (3)"]
 }
 
+# --- MEDYA LİNKLERİ ---
+# Not: Buradaki linkleri gerçek namaz videoları ve sesleri ile güncelleyebilirsin.
+# Mevcut linkler sistemin çalışmasını test etmen içindir.
+HOCA_VIDEO = "https://www.w3schools.com/html/mov_bbb.mp4" 
+HOCA_SES = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+
 if st.button(f"{vakit} Namazını Başlat"):
-    st.success(f"{vakit} namazı kılınışı başlıyor... Lütfen niyet edin.")
+    st.success(f"{vakit} namazı rehberliği başladı. Allah kabul etsin.")
     
-    # Namaz Akış Döngüsü
-    akis = ["Kıyam", "Rüku", "Secde", "Secde", "Kıyam"] # Örnek 1 rekat
-    
-    for adim in akis:
-        st.subheader(f"📍 Bölüm: {adim}")
-        col1, col2 = st.columns([2, 1])
+    for bolum in rekatlar[vakit]:
+        st.header(f"📿 Bölüm: {bolum}")
         
-        with col1:
-            st.video(MEDYA[adim]["video"]) # Hocanın görseli
-        with col2:
-            st.audio(MEDYA[adim]["ses"], autoplay=True) # Hocanın sesi
-            st.write(f"Hoca şimdi {adim} halini gösteriyor.")
+        # Temel Namaz Akışı (Hoca bu sırayla hareket eder)
+        akis = ["Niyet ve Tekbir", "Kıyam (Fatiha ve Sure)", "Rüku", "Secde", "Tahiyyat (Oturuş)"]
         
-        time.sleep(8) # Senin yetişmen için bekleme süresi
-        st.divider()
+        for adim in akis:
+            st.subheader(f"📍 Şu an: {adim}")
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.video(HOCA_VIDEO) # Hoca hareketi
+            with col2:
+                st.audio(HOCA_SES, autoplay=True) # Hoca sesi
+                st.write(f"Lütfen hoca ile birlikte {adim} yapın.")
+            
+            # Senin hareketleri tamamlaman için bekleme süresi
+            time.sleep(10) 
+            st.divider()
 
     st.balloons()
-    st.success("Namaz bitti. Allah kabul etsin!")
+    st.success(f"{vakit} namazı tamamlandı!")
