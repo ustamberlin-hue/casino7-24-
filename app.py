@@ -1,71 +1,85 @@
 import streamlit as st
 import time
 
-st.set_page_config(page_title="Sesli Namaz Hocası", page_icon="🕌")
+st.set_page_config(page_title="AI Namaz Hocası", page_icon="🕌")
 
-st.title("🕌 Tam Sesli Namaz Hocası")
-st.write("Vakti seçin ve sadece hocanın sesli dualarını takip edin.")
+# Tarayıcı tabanlı Yapay Zeka Seslendirme Fonksiyonu
+def sesli_oku(metin):
+    html_kodu = f"""
+    <script>
+        var msg = new SpeechSynthesisUtterance('{metin}');
+        msg.lang = 'tr-TR';
+        msg.rate = 0.85; 
+        window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(html_kodu, height=0)
 
-# 5 Vakit Seçimi
-vakit = st.selectbox("Namaz Vakti Seçin:", ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
+st.title("🕌 Yapay Zeka Sesli Namaz Hocası")
+st.write("Vakti seçin ve sadece hocanın sesini takip edin.")
 
-# DUA VE SURE SES LİNKLERİ
-# Namazda okunan tüm duaların ses dosyaları
-DUALAR = {
-    "Tekbir": "https://www.namazzamani.net/sesli/tekbir.mp3",
-    "Sübhaneke": "https://www.namazzamani.net/sesli/subhaneke.mp3",
-    "Fatiha": "https://www.namazzamani.net/sesli/fatiha.mp3",
-    "Sure": "https://www.namazzamani.net/sesli/ihlas.mp3", # Örnek: İhlas suresi
-    "Rüku": "https://www.namazzamani.net/sesli/ruku_tesbih.mp3",
-    "Secde": "https://www.namazzamani.net/sesli/secde_tesbih.mp3",
-    "Tahiyyat": "https://www.namazzamani.net/sesli/ettehiyyatu.mp3",
-    "SalliBarik": "https://www.namazzamani.net/sesli/sallibarik.mp3",
-    "Rabbena": "https://www.namazzamani.net/sesli/rabbena.mp3",
-    "Selam": "https://www.namazzamani.net/sesli/selam.mp3"
+vakit = st.selectbox("Namaz Vakti:", ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
+
+# TÜM DUALAR VE SURELER (Eksiksiz Liste)
+dualar = {
+    "Niyet": "Niyet ettim Allah rızası için bugünkü namazı kılmaya. Allahu Ekber.",
+    "Subhaneke": "Sübhânekellâhümme ve bi hamdik ve tebârakesmük ve teâlâ ceddük ve lâ ilâhe ğayrük.",
+    "Fatiha": "Elhamdülillâhi rabbilâlemîn. Errahmânirrahîm. Mâliki yevmiddîn. İyyâke na'büdü ve iyyâke nestaîn. İhdinassırâtel müstakîm. Sırâtallezîne en'amte aleyhim ğayrilmağdûbi aleyhim veleddâllîn. Amin.",
+    "Sure": "Kul hüvallâhü ehad. Allâhüssamed. Lem yelid ve lem yûled. Ve lem yekün lehû küfüven ehad.",
+    "Rüku": "Sübhâne rabbiyel azîm. Sübhâne rabbiyel azîm. Sübhâne rabbiyel azîm. Semi Allahu limen hamideh. Rabbena lekel hamd.",
+    "Secde": "Sübhâne rabbiyel alâ. Sübhâne rabbiyel alâ. Sübhâne rabbiyel alâ.",
+    "Tahiyyat": "Ettehiyyâtü lillâhi vessalevâtü vettayyibât. Esselâmü aleyke eyyühen-nebiyyü ve rahmetüllâhi ve berekâtüh. Esselâmü aleynâ ve alâ ibâdillâhis-salihîn. Eşhedü en lâ ilâhe illallâh ve eşhedü enne Muhammeden abdühû ve rasûlüh.",
+    "SalliBarik": "Allahümme salli ala Muhammed. Allahümme barik ala Muhammed.",
+    "Rabbena": "Rabbena atina fiddünya haseneten ve fil ahireti haseneten ve kına azabennar.",
+    "Selam": "Esselâmü aleyküm ve rahmetullâh. Esselâmü aleyküm ve rahmetullâh."
 }
 
-# Namaz Akış Mantığı (Rekat sayıları ve okunacaklar)
-def namaz_kil(vakit_adi, rekat_sayisi):
-    for rekat in range(1, rekat_sayisi + 1):
-        st.subheader(f"📿 {rekat}. Rekat")
-        
-        # 1. Başlangıç (Sadece 1. Rekatta)
-        if rekat == 1:
-            st.write("Niyet ve Tekbir...")
-            st.audio(DUALAR["Tekbir"], autoplay=True)
-            time.sleep(3)
-            st.audio(DUALAR["Sübhaneke"], autoplay=True)
-            time.sleep(5)
-            
-        # 2. Ayakta Okuma
-        st.write("Fatiha ve Sure okunuyor...")
-        st.audio(DUALAR["Fatiha"], autoplay=True)
-        time.sleep(15)
-        st.audio(DUALAR["Sure"], autoplay=True)
-        time.sleep(10)
-        
-        # 3. Rüku ve Secde
-        st.write("Rüku...")
-        st.audio(DUALAR["Rüku"], autoplay=True)
-        time.sleep(7)
-        st.write("Secde...")
-        st.audio(DUALAR["Secde"], autoplay=True)
-        time.sleep(10)
-        
-        # 4. Oturuş (Son rekatta veya her 2 rekatta bir)
-        if rekat == rekat_sayisi or rekat % 2 == 0:
-            st.write("Oturuş ve Dualar...")
-            st.audio(DUALAR["Tahiyyat"], autoplay=True)
-            time.sleep(10)
-            if rekat == rekat_sayisi:
-                st.audio(DUALAR["SalliBarik"], autoplay=True)
-                time.sleep(10)
-                st.audio(DUALAR["Rabbena"], autoplay=True)
-                time.sleep(10)
-                st.audio(DUALAR["Selam"], autoplay=True)
-                st.success("Namaz Tamamlandı.")
-
 if st.button(f"{vakit} Namazını Başlat"):
-    plan = {"Sabah": 2, "Öğle": 4, "İkindi": 4, "Akşam": 3, "Yatsı": 4}
-    namaz_kil(vakit, plan[vakit])
+    # Her vakit için rekat sayısı
+    rekat_sayilari = {"Sabah": 2, "Öğle": 4, "İkindi": 4, "Akşam": 3, "Yatsı": 4}
+    toplam_rekat = rekat_sayilari[vakit]
+    
+    st.success(f"{vakit} namazı ({toplam_rekat} rekat) başlıyor...")
+
+    for r in range(1, toplam_rekat + 1):
+        st.subheader(f"📿 {r}. Rekat")
+        
+        # 1. Rekat Başlangıcı
+        if r == 1:
+            st.info("Niyet ve Tekbir getiriliyor...")
+            sesli_oku(dualar["Niyet"])
+            time.sleep(6)
+            sesli_oku(dualar["Subhaneke"])
+            time.sleep(7)
+
+        # Ayakta Okuma (Kıyam)
+        st.info("Fatiha ve Sure okunuyor...")
+        sesli_oku(dualar["Fatiha"])
+        time.sleep(18)
+        sesli_oku(dualar["Sure"])
+        time.sleep(10)
+
+        # Rüku ve Secde
+        st.info("Rüku ve Secde yapılıyor...")
+        sesli_oku(dualar["Rüku"])
+        time.sleep(10)
+        sesli_oku(dualar["Secde"])
+        time.sleep(12)
+
+        # Ara ve Son Oturuşlar
+        # (Öğle, İkindi, Yatsı'da 2. rekatta oturulur. Akşam'da 2. ve 3. rekatta oturulur.)
+        if r == 2 or r == toplam_rekat:
+            st.info("Oturuş duaları okunuyor...")
+            sesli_oku(dualar["Tahiyyat"])
+            time.sleep(12)
+            
+            # Eğer namazın en sonu ise
+            if r == toplam_rekat:
+                sesli_oku(dualar["SalliBarik"])
+                time.sleep(12)
+                sesli_oku(dualar["Rabbena"])
+                time.sleep(10)
+                sesli_oku(dualar["Selam"])
+                st.success("Namaz bitti. Allah kabul etsin.")
+    
     st.balloons()
