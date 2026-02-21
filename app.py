@@ -1,47 +1,42 @@
 import streamlit as st
-import random
+import time
 
-# Sayfa Ayarları
-st.set_page_config(page_title="Almanca Öğren", page_icon="🇩🇪")
+# Sayfa Yapılandırması
+st.set_page_config(page_title="Sanal Namaz Hocası", page_icon="🕌", layout="wide")
 
-# CSS ile Görünümü Güzelleştirme
-st.markdown("""
-    <style>
-    .main { text-align: center; }
-    .stButton>button { width: 100%; border-radius: 20px; height: 3em; background-color: #FFCC00; color: black; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+st.title("🕌 5 Vakit Sanal Namaz Hocası")
+st.write("Telefonu sabitleyin, sesini açın ve Hocayı takip edin.")
 
-st.title("🇩🇪 Almanca A1-A2 Kelime Kartları")
+# 5 Vakit Seçimi
+vakit = st.sidebar.selectbox("Kılmak istediğiniz namazı seçin:", 
+                     ["Sabah", "Öğle", "İkindi", "Akşam", "Yatsı"])
 
-# Kelime Havuzu
-if 'words' not in st.session_state:
-    st.session_state.words = [
-        {"de": "Der Apfel", "tr": "Elma", "level": "A1"},
-        {"de": "Das Haus", "tr": "Ev", "level": "A1"},
-        {"de": "Entscheiden", "tr": "Karar vermek", "level": "A2"},
-        {"de": "Die Umwelt", "tr": "Çevre", "level": "A2"},
-        {"de": "Günstig", "tr": "Uygun / Ucuz", "level": "A1"},
-        {"de": "Vielleicht", "tr": "Belki", "level": "A2"},
-        {"de": "Frühstücken", "tr": "Kahvaltı yapmak", "level": "A1"},
-        {"de": "Der Unterschied", "tr": "Fark", "level": "A2"}
-    ]
+# --- MEDYA HAVUZU (Hoca Buradan Besleniyor) ---
+# Buradaki linkler internetteki hazır namaz eğitim videolarından çekilir.
+MEDYA = {
+    "Kıyam": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
+    "Rüku": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
+    "Secde": {"video": "https://www.w3schools.com/html/mov_bbb.mp4", "ses": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"}
+}
 
-if 'current_word' not in st.session_state:
-    st.session_state.current_word = random.choice(st.session_state.words)
-    st.session_state.show_answer = False
+if st.button(f"{vakit} Namazını Başlat"):
+    st.success(f"{vakit} namazı kılınışı başlıyor... Lütfen niyet edin.")
+    
+    # Namaz Akış Döngüsü
+    akis = ["Kıyam", "Rüku", "Secde", "Secde", "Kıyam"] # Örnek 1 rekat
+    
+    for adim in akis:
+        st.subheader(f"📍 Bölüm: {adim}")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.video(MEDYA[adim]["video"]) # Hocanın görseli
+        with col2:
+            st.audio(MEDYA[adim]["ses"], autoplay=True) # Hocanın sesi
+            st.write(f"Hoca şimdi {adim} halini gösteriyor.")
+        
+        time.sleep(8) # Senin yetişmen için bekleme süresi
+        st.divider()
 
-# Kelime Kartı Arayüzü
-st.info(f"Seviye: {st.session_state.current_word['level']}")
-st.markdown(f"## {st.session_state.current_word['de']}")
-
-if st.button("Cevabı Göster"):
-    st.session_state.show_answer = True
-
-if st.session_state.show_answer:
-    st.success(f"Türkçesi: **{st.session_state.current_word['tr']}**")
-
-if st.button("Sıradaki Kelime ➡️"):
-    st.session_state.current_word = random.choice(st.session_state.words)
-    st.session_state.show_answer = False
-    st.rerun()
+    st.balloons()
+    st.success("Namaz bitti. Allah kabul etsin!")
